@@ -3,16 +3,9 @@ import json
 import hashlib
 
 from ethereum import _solidity
-from ethereum.abi import event_id, normalize_name, ContractTranslator
 
 from utils import get_contract_path
 
-__all__ = (
-    'REGISTRY_ABI',
-    'TOKENADDED_EVENT',
-    'TOKENADDED_EVENTID',
-    'REGISTRY_TRANSLATOR'
-)
 
 def contract_checksum(contract_path):
     with open(contract_path) as f:
@@ -66,10 +59,12 @@ def get_static_or_compile(
         print("'{}' written".format(precompiled_path))
     return compiled
 
-
-registry_compiled = get_static_or_compile(
-    get_contract_path('Registry.sol'),
-    'Registry',
-    combined='abi',
-)
-REGISTRY_ABI = registry_compiled['abi']
+def get_abi(
+        contract_file,
+        contract_name):
+    registry_compiled = get_static_or_compile(
+        get_contract_path(contract_file),
+        contract_name,
+        combined='abi',
+    )
+    return registry_compiled['abi']
