@@ -1,3 +1,4 @@
+"""
 import gevent
 import rlp
 from eth_utils import decode_hex, encode_hex
@@ -9,20 +10,34 @@ from web3.utils.empty import empty as web3_empty
 from web3.utils.events import get_event_data
 from web3.utils.filters import construct_event_filter_params
 
-from crypto import privkey_to_addr, sign_transaction
+
+import contract_abi
 
 DEFAULT_TIMEOUT = 60
 DEFAULT_RETRY_INTERVAL = 3
 
 
 class ContractProxy:
-    def __init__(self, contract_address, abi, gas_price, gas_limit) -> None:
+    def __init__(self, privkey, contract_file, contract_name, constructor_parameters, contract_address,  
+    gas_price, gas_limit):
         self.web3 = Web3
         if self.web3.eth.defaultAccount == web3_empty:
             self.web3.eth.defaultAccount = self.web3.eth.accounts[0]
-        self.address = contract_address
-        self.abi = abi
-        self.contract = self.web3.eth.contract(abi=self.abi, address=contract_address)
+
+        self.abi = contract_abi.get_static_or_compile(
+            get_contract_path(contract_file),
+            contract_name)
+
+        if contract_address == nil:
+            self.address = deploy_contract(
+                privkey,
+                contract_file,
+                contract_name,
+                constructor_parameters,)
+        else:
+            self.address = contract_address
+
+        self.contract = self.web3.eth.contract(abi=self.abi, address=self.address)
         self.gas_price = gas_price
         self.gas_limit = gas_limit
 
@@ -34,7 +49,7 @@ class ContractProxy:
 
     def create_transaction(self, privkey,func_name, args, nonce_offset=0, value=0):
         sender = privkey_to_addr(privkey)
-        data = self.create_transaction_data(func_name, args)
+        data = self.build_transaction_data(func_name, args)
         nonce = self.web3.eth.getTransactionCount(sender, 'pending') + nonce_offset
         tx = Transaction(nonce, self.gas_price, self.gas_limit, self.address, value, data)
         # v = CHAIN_ID according to EIP 155.
@@ -42,7 +57,7 @@ class ContractProxy:
         tx.sender = decode_hex(sender)
         return tx
 
-    def create_transaction_data(self, func_name, args):
+    def build_transaction_data(self, func_name, args):
         data = self.contract._prepare_transaction(func_name, args)['data']
         return decode_hex(data)
 
@@ -87,60 +102,128 @@ class ContractProxy:
                     self.web3.eth.mine(1)
 
         return None
-    
-class TokenContractProxy(ContractProxy):
-    def get_token_mint_event_blocking(
-            self, user, from_block=0, to_block='latest',
-            wait=DEFAULT_RETRY_INTERVAL, timeout=DEFAULT_TIMEOUT
-    ):
-        filters = {
-            '_user': user,
-        }
-        return self.get_event_blocking(
-            'Mint', from_block, to_block, filters, None, wait, timeout
-        )
-    def get_token_transfer_event_blocking(
-            self, sender, receiver, from_block=0, to_block='latest',
-            wait=DEFAULT_RETRY_INTERVAL, timeout=DEFAULT_TIMEOUT
-    ):
-        filters = {
-            '_from': sender,
-            '_to': receiver
-        }
-        return self.get_event_blocking(
-            'Transfer', from_block, to_block, filters, None, wait, timeout
+"""
+# -*- coding: utf-8 -*-
+from ethereum.abi import ContractTranslator
+from ethereum.utils import normalize_address
+
+
+class ContractProxy(object):
+    """ Exposes a smart contract as a python object.
+
+    Contract calls can be made directly in this object, all the functions will
+    be exposed with the equivalent api and will perform the argument
+    translation.
+    """
+
+    def __init__(self, sender, abi, address, call_func, transact_func, estimate_function=None):
+        sender = normalize_address(sender)
+
+        self.abi = abi
+        self.address = address = normalize_address(address)
+        self.translator = ContractTranslator(abi)
+
+        for function_name in self.translator.function_data:
+            function_proxy = MethodProxy(
+                sender,
+                address,
+                function_name,
+                self.translator,
+                call_func,
+                transact_func,
+                estimate_function,
+            )
+
+            type_argument = self.translator.function_data[function_name]['signature']
+
+            arguments = [
+                '{type} {argument}'.format(type=type_, argument=argument)
+                for type_, argument in type_argument
+            ]
+            function_signature = ', '.join(arguments)
+
+            function_proxy.__doc__ = '{function_name}({function_signature})'.format(
+                function_name=function_name,
+                function_signature=function_signature,
+            )
+
+            setattr(self, function_name, function_proxy)
+
+
+class MethodProxy(object):
+    """ A callable interface that exposes a contract function. """
+    valid_kargs = set(('gasprice', 'startgas', 'value'))
+
+    def __init__(
+            self,
+            sender,
+            contract_address,
+            function_name,
+            translator,
+            call_function,
+            transaction_function,
+            estimate_function=None):
+
+        self.sender = sender
+        self.contract_address = contract_address
+        self.function_name = function_name
+        self.translator = translator
+        self.call_function = call_function
+        self.transaction_function = transaction_function
+        self.estimate_function = estimate_function
+
+    def transact(self, *args, **kargs):
+        assert set(kargs.keys()).issubset(self.valid_kargs)
+        data = self.translator.encode(self.function_name, args)
+
+        txhash = self.transaction_function(
+            sender=self.sender,
+            to=self.contract_address,
+            value=kargs.pop('value', 0),
+            data=data,
+            **kargs
         )
 
-class ManagerContractProxy(ContractProxy):
-    def __init__(self, contract_address, abi, gas_price, gas_limit,
-                 tester_mode=False):
-        super().__init__(contract_address, abi, gas_price, gas_limit, tester_mode)
+        return txhash
 
-    def get_current_locked_token(self, sender, open_block_number):
-        try:
-            channel_info = self.contract.call().getChannelInfo(sender, open_block_number)
-        except BadFunctionCallOutput:
-            # attempt to get info on a channel that doesn't exist
-            return None
-        return channel_info[2]
-    
-    def get_token_locktoken_event_blocking(
-            self, user, from_block=0, to_block='latest',
-            wait=DEFAULT_RETRY_INTERVAL, timeout=DEFAULT_TIMEOUT
-    ):
-        filters = {
-            '_user': user,
-        }
-        return self.get_event_blocking(
-            'LogLockToken', from_block, to_block, filters, None, wait, timeout
+    def call(self, *args, **kargs):
+        assert set(kargs.keys()).issubset(self.valid_kargs)
+        data = self.translator.encode(self.function_name, args)
+
+        res = self.call_function(
+            sender=self.sender,
+            to=self.contract_address,
+            value=kargs.pop('value', 0),
+            data=data,
+            **kargs
         )
-    def get_token_settletoken_event_blocking(
-            self, user, from_block=0, to_block='latest',
-            wait=DEFAULT_RETRY_INTERVAL, timeout=DEFAULT_TIMEOUT
-    ):
-        filters = {
-            '_user': user,
-        }
-        return self.get_event_blocking(
-            'LogSettleToken', from_block, to_block, filters, None, wait, timeout
+
+        if res:
+            res = self.translator.decode(self.function_name, res)
+            res = res[0] if len(res) == 1 else res
+        return res
+
+    def estimate_gas(self, *args, **kargs):
+        if not self.estimate_function:
+            raise RuntimeError('estimate_function was not supplied.')
+
+        assert set(kargs.keys()).issubset(self.valid_kargs)
+        data = self.translator.encode(self.function_name, args)
+
+        res = self.estimate_function(
+            sender=self.sender,
+            to=self.contract_address,
+            value=kargs.pop('value', 0),
+            data=data,
+            **kargs
         )
+
+        return res
+
+    def __call__(self, *args, **kargs):
+        if self.translator.function_data[self.function_name]['is_constant']:
+            result = self.call(*args, **kargs)
+        else:
+            result = self.transact(*args, **kargs)
+
+        return result
