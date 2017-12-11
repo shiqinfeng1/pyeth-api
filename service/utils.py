@@ -27,7 +27,7 @@ def sha3(data):
     return keccak_256(data).digest()
 
 def get_project_root():
-    return os.path.dirname(raiden.__file__)
+    return os.path.abspath(os.path.join(os.path.dirname(__file__),os.path.pardir))
 
 def get_contract_path(contract_name):
     contract_path = os.path.join(

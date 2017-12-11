@@ -18,7 +18,7 @@ def demo():
     poa2 = BlockChainService(
         'poa2', '192.168.1.5','8545',os.getcwd()+'/keystore')
     
-    """transfer eth"""
+    """transfer eth, executed twice in succession"""
     poa1.transfer_eth(
         '0xa1629411f4e8608a7bb88e8a7700f11c59175e72',
         '0x63f1de588c7ce855b66cf24b595a8991f921130d',
@@ -30,7 +30,18 @@ def demo():
         '0x5252781539b365e08015fa7ed77af5a36097f39d',
         123333,
         '123456')
-        
+    
+    poa1.deploy_contract( 
+        '0xa1629411f4e8608a7bb88e8a7700f11c59175e72', 
+        'ERC223Token.sol', 
+        'ERC223Token',
+        (
+            100000,
+            'REX',
+            18,
+            'REX Token'
+        ),)
+
     """ print all accounts & balance """
     addresses = list(poa1.account_manager.accounts.keys())
     for idx, addr in enumerate(addresses):

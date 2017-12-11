@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 from time import time as now
-
+import os
 import rlp
 import gevent
 from gevent.lock import Semaphore
 from ethereum import slogging
-
+from ethereum.abi import ContractTranslator
 from ethereum.exceptions import InvalidTransaction
 from ethereum.transactions import Transaction
 from ethereum.utils import encode_hex, normalize_address
@@ -14,6 +14,12 @@ from pyethapp.jsonrpc import (
 )
 from exceptions import (
     EthNodeCommunicationError,
+)
+from ethereum._solidity import (
+    solidity_unresolved_symbols,
+    solidity_library_symbol,
+    solidity_resolve_symbols,
+    compile_file
 )
 from binascii import hexlify, unhexlify
 import requests
@@ -25,6 +31,7 @@ from tinyrpc.protocols.jsonrpc import (
     JSONRPCProtocol,
     JSONRPCSuccessResponse,
 )
+from service.contract_proxy import ContractProxy
 from utils import (
     address_decoder,
     address_encoder,
@@ -37,6 +44,7 @@ from utils import (
     topic_decoder,
     topic_encoder,
     timeout_two_stage,
+    get_contract_path,
 )
 import accounts_manager
 log = slogging.getLogger(__name__)  # pylint: disable=invalid-name
@@ -109,10 +117,53 @@ class BlockChainService(object):
             port,
             '',
         )
+    def deploy_contract(self, 
+        sender, contract_file, contract_name,
+        constructor_parameters=tuple(),
+        password=None):
+        if self.jsonrpc_proxy.get(sender) == None:
+            if password == None:
+                print("Account {} need unlock first.".format(
+                    sender,
+                ))
+                return
+            private_key = self.account_manager.get_account(sender,password).privkey
+            self.jsonrpc_proxy[sender] = JSONRPCClient(
+                host = self.host,
+                port = self.port,
+                privkey = private_key,
+            )
+            
 
-    def transfer_eth(self, sender, to, eth_amount,password):
+        client = self.jsonrpc_proxy[sender]
+        print('sender: ',sender, client.privkey) 
+        path = get_contract_path(contract_file)
+
+        log.info('sender: {} deploying contract: {} in {} ...'
+            .format(sender,contract_name,path))
+
+        contract_proxy = client.deploy_solidity_contract(
+            unhexlify(sender[2:]),
+            contract_name, #contract_name
+            compile_file(path, libraries=dict()), #all_contracts
+            dict(),  #libraries dict()
+            constructor_parameters, #constructor_parameters tuple() (p1, p2, p3, p4)
+            contract_path = path,
+            gasprice=constant.GAS_PRICE,
+            timeout=constant.DEFAULT_POLL_TIMEOUT,
+        )
+        log.info('Deploying ok. contract address: {} .'.format(hexlify(contract_proxy.address)))
+        return contract_proxy
+
+
+    def transfer_eth(self, sender, to, eth_amount,password=None):
         
         if self.jsonrpc_proxy.get(sender) == None:
+            if password == None:
+                print("Account {} need unlock first.".format(
+                    sender,
+                ))
+                return
             private_key = self.account_manager.get_account(sender,password).privkey
             self.jsonrpc_proxy[sender] = JSONRPCClient(
                 self.host,
@@ -524,7 +575,7 @@ class JSONRPCClient(object):
 
         if not startgas:
             startgas = self.gaslimit() - 1
-        print("nonce={}".format(nonce))
+
         tx = Transaction(nonce, gasprice, startgas, to=to, value=value, data=data)
 
         if self.privkey:
