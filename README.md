@@ -4,9 +4,13 @@ It supports JSONRPC or import directly in the application.
 
 pyeth-api runs on Python 2.7, for Pyethapp is only support for Python 2.7.
 
+## pre-prepare
+1. recommended install pyenv tools to manage virtualenv
+1. install solc
+
 ## fetures
 
-## function
+## functions
 1. accounts manage
 1. contract deploy
 1. contract operation proxy
