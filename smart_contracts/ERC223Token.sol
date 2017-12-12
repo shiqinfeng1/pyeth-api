@@ -23,7 +23,7 @@ contract ERC223Token is StandardToken {
 
     uint256 multiplier;
 
-    event Minted(address indexed _from, uint256 indexed _num, uint256 _value);
+    event Minted(address indexed _to, uint256 indexed _num);
 
     /*
     NOTE:
@@ -50,17 +50,17 @@ contract ERC223Token is StandardToken {
         symbol = _tokenSymbol;                               // Set the symbol for display purposes
     }
 
-    function mint()
+    function mint(address _user, uint256 _amount)
         public
         payable
     {
-        require(msg.value >= 100 finney);
+        require(msg.sender == owner);
 
-        uint256 num = 50 * multiplier;
+        uint256 num = _amount * multiplier;
 
         totalSupply += num;
-        balances[msg.sender] += num;
+        balances[_user] += num;
 
-        Minted(msg.sender, num, msg.value);
+        Minted(_user, num);
     }
 }

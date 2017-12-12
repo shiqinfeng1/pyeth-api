@@ -12,6 +12,7 @@ from ethereum.utils import encode_hex, normalize_address
 from pyethapp.jsonrpc import (
     data_encoder,
 )
+
 from exceptions import (
     EthNodeCommunicationError,
 )
@@ -41,8 +42,8 @@ from utils import (
     privatekey_to_address,
     quantity_decoder,
     quantity_encoder,
-    topic_decoder,
     topic_encoder,
+    topic_decoder,
     timeout_two_stage,
     get_contract_path,
 )
@@ -108,7 +109,7 @@ class BlockChainService(object):
         self.chain_name = chain_name
         self.host = host
         self.port = port
-        self.contract_proxy = dict()
+        self.contract_owner_proxy =  dict()
         self.jsonrpc_proxy =  dict()
         self.account_manager = accounts_manager.AccountManager(keystore_path)
 
@@ -117,15 +118,41 @@ class BlockChainService(object):
             port,
             '',
         )
+    def get_contract_proxy(self, sender,contract_name,password=None):
+        if self.jsonrpc_proxy.get(sender) == None:
+            if password == None:
+                log.info("Account {} need unlock first.".format(sender))
+                return
+            private_key = self.account_manager.get_account(sender,password).privkey
+            self.jsonrpc_proxy[sender] = JSONRPCClient(
+                host = self.host,
+                port = self.port,
+                privkey = private_key,
+            )
+        client = self.jsonrpc_proxy[sender]
+        
+        contract_owner = self.contract_owner_proxy.get(contract_name)
+        if contract_owner == None:
+            log.info("Not found contract proxy. deploy contract {} first.".format(contract_name))
+            return None
+
+        if contract_owner == sender:
+            return contract_owner
+        
+        print('contract_owner.address={} contract_owner.sender={}'.format(contract_owner.address,client.sender))
+        contract_proxy = client.new_contract_proxy(
+            contract_owner.abi,
+            contract_owner.address,
+        )
+        return contract_proxy
+            
     def deploy_contract(self, 
         sender, contract_file, contract_name,
         constructor_parameters=tuple(),
         password=None):
         if self.jsonrpc_proxy.get(sender) == None:
             if password == None:
-                print("Account {} need unlock first.".format(
-                    sender,
-                ))
+                log.info("Account {} need unlock first.".format(sender))
                 return
             private_key = self.account_manager.get_account(sender,password).privkey
             self.jsonrpc_proxy[sender] = JSONRPCClient(
@@ -136,7 +163,6 @@ class BlockChainService(object):
             
 
         client = self.jsonrpc_proxy[sender]
-        print('sender: ',sender, client.privkey) 
         path = get_contract_path(contract_file)
 
         log.info('sender: {} deploying contract: {} in {} ...'
@@ -153,6 +179,7 @@ class BlockChainService(object):
             timeout=constant.DEFAULT_POLL_TIMEOUT,
         )
         log.info('Deploying ok. contract address: {} .'.format(hexlify(contract_proxy.address)))
+        self.contract_owner_proxy[contract_name] = contract_proxy
         return contract_proxy
 
 
@@ -655,6 +682,32 @@ class JSONRPCClient(object):
 
         return data_decoder(res)
 
+    def _format_call(self, sender='', to='', value=0, data='',
+                     startgas=constant.GAS_PRICE, gasprice=constant.GAS_PRICE):
+        """ Helper to format the transaction data. """
+
+        json_data = dict()
+
+        if sender is not None:
+            json_data['from'] = address_encoder(sender)
+
+        if to is not None:
+            json_data['to'] = data_encoder(to)
+
+        if value is not None:
+            json_data['value'] = quantity_encoder(value)
+
+        if gasprice is not None:
+            json_data['gasPrice'] = quantity_encoder(gasprice)
+
+        if startgas is not None:
+            json_data['gas'] = quantity_encoder(startgas)
+
+        if data is not None:
+            json_data['data'] = data_encoder(data)
+
+        return json_data
+
     def eth_call(
             self,
             sender='',
@@ -681,7 +734,7 @@ class JSONRPCClient(object):
                 call.
         """
 
-        json_data = format_data_for_call(
+        json_data = self._format_call(
             sender,
             to,
             value,
@@ -719,7 +772,7 @@ class JSONRPCClient(object):
                 call.
         """
 
-        json_data = format_data_for_call(
+        json_data = self._format_call(
             sender,
             to,
             value,

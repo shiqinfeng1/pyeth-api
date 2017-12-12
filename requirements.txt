@@ -1,0 +1,10 @@
+gevent-websocket
+rlp>=0.4.3,<0.6.0
+gevent
+ethereum==1.6.1
+pyethapp
+requests
+coincurve
+tinyrpc
+eth_utils
+crypto
