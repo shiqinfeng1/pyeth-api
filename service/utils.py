@@ -4,6 +4,15 @@ from coincurve import PrivateKey
 from binascii import hexlify, unhexlify
 from sha3 import keccak_256
 
+def split_endpoint(endpoint):
+    match = re.match(r'(?:[a-z0-9]*:?//)?([^:/]+)(?::(\d+))?', endpoint, re.I)
+    if not match:
+        raise ValueError('Invalid endpoint', endpoint)
+    host, port = match.groups()
+    if port:
+        port = int(port)
+    return host, port
+
 def timeout_two_stage(retries, timeout1, timeout2):
     """ Timeouts generator with a two stage strategy
 
