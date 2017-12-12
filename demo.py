@@ -15,9 +15,9 @@ from ethereum import slogging
 
 def demo():
     poa1 = BlockChainService(
-        'poa1', '192.168.20.141','8545',os.getcwd()+'/keystore')
+        'poa1', '192.168.1.5','8545',os.getcwd()+'/keystore')
     poa2 = BlockChainService(
-        'poa2', '192.168.20.141','8545',os.getcwd()+'/keystore')
+        'poa2', '192.168.1.5','8545',os.getcwd()+'/keystore')
     
     """transfer eth, executed twice in succession"""
     owner = '0xa1629411f4e8608a7bb88e8a7700f11c59175e72'
@@ -47,10 +47,10 @@ def demo():
 
     ERC223Token_1 = poa1.get_contract_proxy(owner,'ERC223Token')
     ERC223Token_1.mint(user_1,1233)
-
+    gevent.sleep(20)
     ERC223Token_2 = poa1.get_contract_proxy(user_1,'ERC223Token','123456')
     ERC223Token_2.transfer(user_2,111)
-    gevent.sleep(20)
+    
 
     """ print all accounts & balance """
     addresses = list(poa1.account_manager.accounts.keys())

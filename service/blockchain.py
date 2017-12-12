@@ -139,7 +139,6 @@ class BlockChainService(object):
         if contract_owner == sender:
             return contract_owner
         
-        print('contract_owner.address={} contract_owner.sender={}'.format(contract_owner.address,client.sender))
         contract_proxy = client.new_contract_proxy(
             contract_owner.abi,
             contract_owner.address,
