@@ -96,6 +96,29 @@ def check_node_connection(func):
     return retry_on_disconnect
 
 class BlockChainService(object):
+    def __init__(self):      
+        self.blockchain_proxy =  dict()
+    
+    def new_blockchain_proxy(self,
+            chain_name,
+            host,
+            port,
+            keystore_path):
+        
+        self.blockchain_proxy[chain_name] = BlockChainProxy(
+            chain_name,
+            host,
+            port,
+            keystore_path)
+        return self.blockchain_proxy[chain_name]
+
+    def get_blockchain_proxy(self,chain_name):
+        if self.blockchain_proxy[chain_name] == None:
+            log.info("blockchain {} not registered!".format(chain_name))
+            return None
+        return self.blockchain_proxy[chain_name]
+
+class BlockChainProxy(object):
     """ Exposes the blockchain's state through JSON-RPC. """
     # pylint: disable=too-many-instance-attributes
 
@@ -118,6 +141,8 @@ class BlockChainService(object):
             port,
             '',
         )
+
+    """获取本合约管理服务维护的和合约代理"""
     def get_contract_proxy(self, sender,contract_name,password=None):
         if self.jsonrpc_proxy.get(sender) == None:
             if password == None:
@@ -144,7 +169,47 @@ class BlockChainService(object):
             contract_owner.address,
         )
         return contract_proxy
-            
+
+    """给通过第三方服务部署的合约关联一个合约代理"""
+    def attach_contract(self, 
+            sender, contract_address, contract_file, contract_name,
+            password=None):
+
+        if self.jsonrpc_proxy.get(sender) == None:
+            if password == None:
+                log.info("Account {} need unlock first.".format(sender))
+                return
+            private_key = self.account_manager.get_account(sender,password).privkey
+            self.jsonrpc_proxy[sender] = JSONRPCClient(
+                host = self.host,
+                port = self.port,
+                privkey = private_key,
+            )
+        
+        client = self.jsonrpc_proxy[sender]
+        deployed_code = client.eth_getCode(contract_address)
+        if deployed_code == '0x':
+            raise RuntimeError('Contract address has no code. deploy contract first.')
+        contract_path=get_contract_path(contract_file)
+        all_contracts = compile_file(contract_path, libraries=dict())
+        if contract_name in all_contracts:
+            contract_key = contract_name
+
+        elif contract_path is not None:
+            _, filename = os.path.split(contract_path)
+            contract_key = filename + ':' + contract_name
+
+            if contract_key not in all_contracts:
+                raise ValueError('Unknown contract {}'.format(contract_name))
+        else:
+            raise ValueError(
+                'Unknown contract {} and no contract_path given'.format(contract_name)
+            )
+        return client.new_contract_proxy(
+            all_contracts[contract_key]['abi'],
+            contract_address,
+        )
+
     def deploy_contract(self, 
         sender, contract_file, contract_name,
         constructor_parameters=tuple(),
@@ -159,7 +224,6 @@ class BlockChainService(object):
                 port = self.port,
                 privkey = private_key,
             )
-            
 
         client = self.jsonrpc_proxy[sender]
         path = get_contract_path(contract_file)
