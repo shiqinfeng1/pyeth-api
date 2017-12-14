@@ -6,6 +6,7 @@ from pyethapi.service import constant
 from raipyethapi.service.utils import (
     split_endpoint
 )
+from ethereum import slogging
 
 def toogle_cpu_profiler(raiden):
     try:
