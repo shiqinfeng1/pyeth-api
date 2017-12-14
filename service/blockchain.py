@@ -2,6 +2,7 @@
 from time import time as now
 import os
 import rlp
+import re
 import gevent
 from gevent.lock import Semaphore
 from ethereum import slogging
@@ -95,6 +96,41 @@ def check_node_connection(func):
 
     return retry_on_disconnect
 
+def check_json_rpc(client):
+    try:
+        client_version = client.call('web3_clientVersion')
+    except (requests.exceptions.ConnectionError, EthNodeCommunicationError):
+        print(
+            "\n"
+            "Couldn't contact the ethereum node through JSON-RPC.\n"
+            "Please make sure the JSON-RPC is enabled for these interfaces:\n"
+            "\n"
+            "    eth_*, net_*, web3_*\n"
+            "\n"
+            "geth: https://github.com/ethereum/go-ethereum/wiki/Management-APIs\n"
+        )
+        return False
+    else:
+        if client_version.startswith('Parity'):
+            major, minor, patch = [
+                int(x) for x in re.search(r'//v(\d+)\.(\d+)\.(\d+)', client_version).groups()
+            ]
+            if (major, minor, patch) < (1, 7, 6):
+                print('You need Byzantium enabled parity. >= 1.7.6 / 1.8.0')
+                return False
+        elif client_version.startswith('Geth'):
+            major, minor, patch = [
+                int(x) for x in re.search(r'/v(\d+)\.(\d+)\.(\d+)', client_version).groups()
+            ]
+            if (major, minor, patch) < (1, 7, 2):
+                print('You need Byzantium enabled geth. >= 1.7.2')
+                return False
+        else:
+            print('Unsupported client {} detected.'.format(client_version))
+            return False
+
+    return True
+
 class BlockChainService(object):
     
     def __init__(self):      
@@ -111,6 +147,12 @@ class BlockChainService(object):
             host,
             port,
             keystore_path)
+        if self.blockchain_proxy[chain_name] == None:
+            raise RuntimeError('create BlockChainProxy fail.')
+        
+        if not check_json_rpc(self.blockchain_proxy[chain_name].jsonrpc_client):
+            raise RuntimeError('BlockChainProxy connect eth-client fail.')
+
         return self.blockchain_proxy[chain_name]
 
     def get_blockchain_proxy(self,chain_name):

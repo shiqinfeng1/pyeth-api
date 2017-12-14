@@ -59,7 +59,6 @@ class Console(object):
             tools=ConsoleTools(
                 self.app
             ),
-            denoms=denoms,
             true=True,
             false=False,
             usage=print_usage,
