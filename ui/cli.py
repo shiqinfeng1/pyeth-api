@@ -1,11 +1,14 @@
 import click
+import os
 import gevent
 import gevent.monkey
+from gevent import Greenlet
 import signal
 from pyethapi.service import constant 
-from raipyethapi.service.utils import (
+from pyethapi.service.utils import (
     split_endpoint
 )
+from pyethapi.api.rest import APIServer, RestAPI
 from ethereum import slogging
 
 def toogle_cpu_profiler(raiden):
@@ -91,14 +94,6 @@ OPTIONS = [
         show_default=True,
     ),
     click.option(
-        '--eth-rpc-endpoint',
-        help='"host:port" address of ethereum JSON-RPC server.\n'
-        'Also accepts a protocol prefix (http:// or https://) with optional port',
-        default='127.0.0.1:8545',  # geth default jsonrpc port
-        type=str,
-        show_default=True,
-    ),
-    click.option(
         '--rpcaddress',
         help='"host:port" for the service to listen on.',
         default='0.0.0.0:{}'.format(constant.INITIAL_PORT),
@@ -137,12 +132,10 @@ def options(func):
 
 @options
 @click.command()
-def app(address,
-        keystore_path,
+def app(keystore_path,
         gas_price,
-        eth_rpc_endpoint,
         rpccorsdomain,
-        rpc_address,
+        rpcaddress,
         rpc,
         console):
 
@@ -150,33 +143,23 @@ def app(address,
 
     from pyethapi.service.blockchain import BlockChainService
 
-    (api_host, api_port) = split_endpoint(rpc_address)
+    blockchain_service = BlockChainService()
 
-
-    endpoint = eth_rpc_endpoint
-    eth_rpc_host = 8545
-    if ':' not in endpoint:  # no port was given in url
-        eth_rpc_host = endpoint
-    else:
-        eth_rpc_host, eth_rpc_port = split_endpoint(endpoint)
-
-    rpcclient = BlockChainService(
-        'BCS-'+eth_rpc_host+eth_rpc_host, eth_rpc_host,eth_rpc_port,os.getcwd()+'/keystore')
-
-    # this assumes the eth node is already online
-    if not check_json_rpc(rpcclient.jsonrpc_client):
-        sys.exit(1)
+    return blockchain_service
 
 
 @click.group(invoke_without_command=True)
 @options
 @click.pass_context
 def run(ctx, **kwargs):
+    from pyethapi.api.python import PYETHAPI
+    from pyethapi.ui.console import Console
+
     if ctx.invoked_subcommand is None:
         print('Welcome to pyeth-api-server!')
         slogging.configure(':DEBUG')
 
-        app_ = ctx.invoke(app, **kwargs)
+        blockchain_proxy = ctx.invoke(app, **kwargs)
         domain_list = []
         if kwargs['rpccorsdomain']:
             if ',' in kwargs['rpccorsdomain']:
@@ -185,15 +168,19 @@ def run(ctx, **kwargs):
             else:
                 domain_list.append(str(kwargs['rpccorsdomain']))
         if ctx.params['rpc']:
-            raiden_api = RaidenAPI(app_.raiden)
-            rest_api = RestAPI(raiden_api)
+            pyeth_api = PYETHAPI(blockchain_proxy)
+            rest_api = RestAPI(pyeth_api)
             api_server = APIServer(
                 rest_api,
                 cors_domain_list=domain_list,
-                eth_rpc_endpoint=ctx.params['eth_rpc_endpoint'],
             )
             (api_host, api_port) = split_endpoint(kwargs['rpcaddress'])
-            api_server.start(api_host, api_port)
+            Greenlet.spawn(
+                api_server.run,
+                api_port,
+                debug=False,
+                use_evalex=False
+            )
 
             print(
                 'The pyeth API RPC server is now running at http://{}:{}/.\n\n'.format(
@@ -203,8 +190,11 @@ def run(ctx, **kwargs):
             )
 
         if ctx.params['console']:
-            console = Console(app_)
+            console = Console(blockchain_proxy)
             console.start()
+            Greenlet.spawn(
+                console.run
+            )
 
         # wait for interrupt
         event = gevent.event.Event()
@@ -216,13 +206,14 @@ def run(ctx, **kwargs):
         gevent.signal(signal.SIGUSR2, toggle_trace_profiler)
 
         event.wait()
-
+        """
         try:
             api_server.stop()
         except NameError:
             pass
 
-        app_.stop()
+        blockchain_proxy.stop()
+        """
     else:
         # Pass parsed args on to subcommands.
         ctx.obj = kwargs

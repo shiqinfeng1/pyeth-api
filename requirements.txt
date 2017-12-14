@@ -8,3 +8,7 @@ coincurve
 tinyrpc
 eth_utils
 crypto
+flask
+flask_restful
+flask_cors
+webargs

@@ -17,8 +17,12 @@ blockchain_service = BlockChainService()
 def demo():
     poa1 = blockchain_service.new_blockchain_proxy(
         'poa1', '192.168.1.5','8545',os.getcwd()+'/keystore')
+    if not check_json_rpc(poa1.jsonrpc_client):
+        sys.exit(1)
     poa2 = blockchain_service.new_blockchain_proxy(
         'poa2', '192.168.1.5','8545',os.getcwd()+'/keystore')
+    if not check_json_rpc(poa2.jsonrpc_client):
+        sys.exit(1)
     
     """transfer eth, executed twice in succession"""
     owner = '0xa1629411f4e8608a7bb88e8a7700f11c59175e72'

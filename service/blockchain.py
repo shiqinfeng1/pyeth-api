@@ -32,7 +32,7 @@ from tinyrpc.protocols.jsonrpc import (
     JSONRPCProtocol,
     JSONRPCSuccessResponse,
 )
-from service.contract_proxy import ContractProxy
+from contract_proxy import ContractProxy
 from utils import (
     address_decoder,
     address_encoder,
@@ -96,6 +96,7 @@ def check_node_connection(func):
     return retry_on_disconnect
 
 class BlockChainService(object):
+    
     def __init__(self):      
         self.blockchain_proxy =  dict()
     

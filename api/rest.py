@@ -1,5 +1,16 @@
-from pyeth-api.api.v1.encoding import (
+from flask import Flask, make_response, url_for
+from flask.json import jsonify
+from flask_restful import Api, abort
+from flask_cors import CORS
+from webargs.flaskparser import parser
+from pyethapp.jsonrpc import address_encoder
+
+from pyethapi.api.v1.encoding import (
     HexAddressConverter,
+)
+from pyethapi.api.v1.resources import (
+    create_blueprint,
+    BlockchainResource,
 )
 
 class APIServer(object):
@@ -29,7 +40,8 @@ class APIServer(object):
         self.flask_app.register_blueprint(self.blueprint)
 
     def _add_default_resources(self):
-        self.add_resource(AddressResource, '/address')
+        self.add_resource(BlockchainResource, '/address')
+        """
         self.add_resource(ChannelsResource, '/channels')
         self.add_resource(
             ChannelsResourceByChannelAddress,
@@ -41,6 +53,7 @@ class APIServer(object):
             '/tokens/<hexaddress:token_address>/partners'
         )
         self.add_resource(NetworkEventsResource, '/events/network')
+        """
 
     def _register_type_converters(self, additional_mapping=None):
         # an additional mapping concats to class-mapping and will overwrite existing keys
@@ -62,7 +75,7 @@ class APIServer(object):
     def run(self, port, **kwargs):
         if 'host' in kwargs:
             raise ValueError('The server host is hardcoded, can\'t set it')
-        self.flask_app.run(port=port, host='localhost', **kwargs)
+        self.flask_app.run(port=port, host='0.0.0.0', **kwargs)
 
 
 class RestAPI(object):
