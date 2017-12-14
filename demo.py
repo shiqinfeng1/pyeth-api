@@ -13,10 +13,11 @@ from  service.constant import (
 )
 from ethereum import slogging
 
+blockchain_service = BlockChainService()
 def demo():
-    poa1 = BlockChainService(
+    poa1 = blockchain_service.new_blockchain_proxy(
         'poa1', '192.168.1.5','8545',os.getcwd()+'/keystore')
-    poa2 = BlockChainService(
+    poa2 = blockchain_service.new_blockchain_proxy(
         'poa2', '192.168.1.5','8545',os.getcwd()+'/keystore')
     
     """transfer eth, executed twice in succession"""
@@ -48,7 +49,9 @@ def demo():
     ERC223Token_1 = poa1.get_contract_proxy(owner,'ERC223Token')
     ERC223Token_1.mint(user_1,1233)
     gevent.sleep(20)
-    ERC223Token_2 = poa1.get_contract_proxy(user_1,'ERC223Token','123456')
+    ERC223Token_2 = poa1.attach_contract(
+        user_1,ERC223Token_1.address,
+        'ERC223Token.sol','ERC223Token','123456')
     ERC223Token_2.transfer(user_2,111)
     
 
