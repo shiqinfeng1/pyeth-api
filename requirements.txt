@@ -6,7 +6,6 @@ pyethapp
 requests
 coincurve
 tinyrpc
-eth_utils
 crypto
 flask
 flask_restful

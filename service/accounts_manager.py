@@ -2,7 +2,6 @@
 import getpass
 import sys
 import os
-from eth_utils import is_address
 from ethereum import slogging
 from ethereum import keys
 from bitcoin import privtopub

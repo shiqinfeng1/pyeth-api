@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
 from ethereum.abi import ContractTranslator
 from ethereum.utils import normalize_address
-
-
+from pyethapi.service.events import (
+    new_filter,
+    Filter,
+)
+from pyethapi.service.events import (
+    BlockchainEvents,
+)
 class ContractProxy(object):
     """ Exposes a smart contract as a python object.
 
@@ -41,8 +46,38 @@ class ContractProxy(object):
                 function_name=function_name,
                 function_signature=function_signature,
             )
-
             setattr(self, function_name, function_proxy)
+
+    def events_filter(self, rpcclient, contract_address, topics, from_block=None, to_block=None):
+            
+        """ Install a new filter for an array of topics emitted by contract.
+        Args:
+            topics (list): A list of event ids to filter for. Can also be None,
+                           in which case all events are queried.
+
+        Return:
+            Filter: The filter instance.
+        """
+        filter_id_raw = new_filter(
+            rpcclient,
+            contract_address,
+            topics=topics,
+            from_block=from_block,
+            to_block=to_block
+        )
+
+        return Filter(
+            rpcclient,
+            filter_id_raw,
+        )
+    
+    def all_events_filter(self, from_block=None, to_block=None):
+            """ Install a new filter for all the events emitted by the current contract
+
+        Return:
+            Filter: The filter instance.
+        """
+        return self.events_filter(None, from_block, to_block)
 
 
 class MethodProxy(object):

@@ -48,6 +48,7 @@ from utils import (
     timeout_two_stage,
     get_contract_path,
 )
+
 import accounts_manager
 log = slogging.getLogger(__name__)  # pylint: disable=invalid-name
 
@@ -135,7 +136,7 @@ class BlockChainService(object):
     
     def __init__(self):      
         self.blockchain_proxy =  dict()
-    
+
     def new_blockchain_proxy(self,
             chain_name,
             host,
