@@ -4,7 +4,7 @@ from service.blockchain import (
 )
 import gevent
 from service import accounts_manager
-import custom_contract_proxy
+
 from service.utils import (
     address_decoder,
 )
@@ -48,12 +48,19 @@ def demo():
         ))
 
     ERC223Token_1 = poa1.get_contract_proxy(owner,'ERC223Token')
-    ERC223Token_1.mint(user_1,1233)
-    gevent.sleep(20)
+    block_number = poa1.block_number()
+    txhash = ERC223Token_1.mint(user_1,1111)
+    poa1.poll_contarct_transaction_result(block_number,ERC223Token_1,txhash,'Minted',user_1)
+    
     ERC223Token_2 = poa1.attach_contract(
-        user_1,ERC223Token_1.address,
+        user_1,
+        ERC223Token_1.address,
         'ERC223Token.sol','ERC223Token','123456')
-    ERC223Token_2.transfer(user_2,111)
+
+    block_number = poa1.block_number()
+    txhash = ERC223Token_2.transfer(user_2,1)
+    poa1.poll_contarct_transaction_result(block_number,ERC223Token_2,txhash,'Transfer',user_1,user_2)
+    #ERC223Token_1.poll_contract_event(block_number,'ERC223Token','Minted',user_2)
     
 
     """ print all accounts & balance """
@@ -62,7 +69,7 @@ def demo():
         print("[{:3d}]account: 0x{} \nbalance:{} ETH \nbalance:{} REX"
             .format(idx, addr,
             poa1.balance(address_decoder(addr))/WEI_TO_ETH,
-            ERC223Token_2.balanceOf(addr)))
+            ERC223Token_2.balanceOf(addr)/WEI_TO_ETH))
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from time import time as now
 import os
+import sys
 import rlp
 import re
 import gevent
@@ -47,6 +48,7 @@ from utils import (
     topic_decoder,
     timeout_two_stage,
     get_contract_path,
+    bool_decoder,
 )
 
 import accounts_manager
@@ -74,9 +76,6 @@ def check_transaction_threw(client, transaction_hash):
     receipt = client.call('eth_getTransactionReceipt', encoded_transaction)
     return int(transaction['gas'], 0) == int(receipt['gasUsed'], 0)
 
-
-def decode_topic(topic):
-    return int(topic[2:], 16)
 
 def check_node_connection(func):
     """ A decorator to reconnect if the connection to the node is lost """
@@ -186,19 +185,25 @@ class BlockChainProxy(object):
             '',
         )
 
-    """获取本合约管理服务维护的和合约代理"""
-    def get_contract_proxy(self, sender,contract_name,password=None):
+    def get_jsonrpc_client(self, sender, password=None):
         if self.jsonrpc_proxy.get(sender) == None:
             if password == None:
                 log.info("Account {} need unlock first.".format(sender))
-                return
+                return None
             private_key = self.account_manager.get_account(sender,password).privkey
             self.jsonrpc_proxy[sender] = JSONRPCClient(
                 host = self.host,
                 port = self.port,
                 privkey = private_key,
             )
-        client = self.jsonrpc_proxy[sender]
+        return self.jsonrpc_proxy[sender]
+
+    """获取本合约管理服务维护的和合约代理"""
+    def get_contract_proxy(self, sender,contract_name,password=None):
+        
+        client = self.get_jsonrpc_client(sender,password)
+        if client == None:
+            return
         
         contract_owner = self.contract_owner_proxy.get(contract_name)
         if contract_owner == None:
@@ -209,6 +214,7 @@ class BlockChainProxy(object):
             return contract_owner
         
         contract_proxy = client.new_contract_proxy(
+            contract_name,
             contract_owner.abi,
             contract_owner.address,
         )
@@ -219,18 +225,10 @@ class BlockChainProxy(object):
             sender, contract_address, contract_file, contract_name,
             password=None):
 
-        if self.jsonrpc_proxy.get(sender) == None:
-            if password == None:
-                log.info("Account {} need unlock first.".format(sender))
-                return
-            private_key = self.account_manager.get_account(sender,password).privkey
-            self.jsonrpc_proxy[sender] = JSONRPCClient(
-                host = self.host,
-                port = self.port,
-                privkey = private_key,
-            )
-        
-        client = self.jsonrpc_proxy[sender]
+        client = self.get_jsonrpc_client(sender,password)
+        if client == None:
+            return
+
         deployed_code = client.eth_getCode(contract_address)
         if deployed_code == '0x':
             raise RuntimeError('Contract address has no code. deploy contract first.')
@@ -250,29 +248,45 @@ class BlockChainProxy(object):
                 'Unknown contract {} and no contract_path given'.format(contract_name)
             )
         return client.new_contract_proxy(
+            contract_name,
             all_contracts[contract_key]['abi'],
             contract_address,
         )
+    def poll_contarct_transaction_result(self,
+        fromBlock,
+        contract_proxy,
+        transaction_hash,
+        event_name=None,*event_filter_args):
 
+        contract_proxy.jsonrpc_client.poll(
+            unhexlify(transaction_hash),
+            timeout=constant.DEFAULT_POLL_TIMEOUT,
+        )
+        
+        fail = check_transaction_threw(contract_proxy.jsonrpc_client, transaction_hash)
+        if fail:
+            log.info('transaction({}) execute failed .'.format(transaction_hash))
+            return False
+
+        if event_name != None:
+            contract_proxy.poll_contract_event(
+                fromBlock,
+                contract_proxy.contract_name,
+                event_name,
+                *event_filter_args)
+        
     def deploy_contract(self, 
         sender, contract_file, contract_name,
         constructor_parameters=tuple(),
         password=None):
-        if self.jsonrpc_proxy.get(sender) == None:
-            if password == None:
-                log.info("Account {} need unlock first.".format(sender))
-                return
-            private_key = self.account_manager.get_account(sender,password).privkey
-            self.jsonrpc_proxy[sender] = JSONRPCClient(
-                host = self.host,
-                port = self.port,
-                privkey = private_key,
-            )
 
-        client = self.jsonrpc_proxy[sender]
+        client = self.get_jsonrpc_client(sender,password)
+        if client == None:
+            return
+
         path = get_contract_path(contract_file)
 
-        log.info('sender: {} deploying contract: {} in {} ...'
+        log.info('deploying contract: SENDER: {} ADDRESS: {} FILE: {} ...'
             .format(sender,contract_name,path))
 
         contract_proxy = client.deploy_solidity_contract(
@@ -292,19 +306,10 @@ class BlockChainProxy(object):
 
     def transfer_eth(self, sender, to, eth_amount,password=None):
         
-        if self.jsonrpc_proxy.get(sender) == None:
-            if password == None:
-                print("Account {} need unlock first.".format(
-                    sender,
-                ))
-                return
-            private_key = self.account_manager.get_account(sender,password).privkey
-            self.jsonrpc_proxy[sender] = JSONRPCClient(
-                self.host,
-                self.port,
-                private_key,
-            )
-        client = self.jsonrpc_proxy[sender]
+        client = self.get_jsonrpc_client(sender,password)
+        if client == None:
+            return
+
         balance = self.balance(client.sender)
 
         balance_needed =  eth_amount
@@ -457,7 +462,7 @@ class JSONRPCClient(object):
         gas_limit = quantity_decoder(last_block['gasLimit'])
         return gas_limit
 
-    def new_contract_proxy(self, contract_interface, address):
+    def new_contract_proxy(self, contract_name,contract_interface, address):
         """ Return a proxy for interacting with a smart contract.
 
         Args:
@@ -465,7 +470,9 @@ class JSONRPCClient(object):
             address: The contract's address.
         """
         return ContractProxy(
+            self,
             self.sender,
+            contract_name,
             contract_interface,
             address,
             self.eth_call,
@@ -601,38 +608,46 @@ class JSONRPCClient(object):
             )
 
         return self.new_contract_proxy(
+            contract_name,
             contract_interface,
             contract_address,
         )
 
-    def new_filter(self, fromBlock=None, toBlock=None, address=None, topics=None):
+    def new_filter(self, address=None, topics=None, fromBlock=0, toBlock='latest'):
         """ Creates a filter object, based on filter options, to notify when
         the state changes (logs). To check if the state has changed, call
         eth_getFilterChanges.
         """
+        if isinstance(fromBlock, int):
+            fromBlock = hex(fromBlock)
+
+        if isinstance(toBlock, int):
+            toBlock = hex(toBlock)
 
         json_data = {
-            'fromBlock': block_tag_encoder(fromBlock or ''),
-            'toBlock': block_tag_encoder(toBlock or ''),
+            'fromBlock': fromBlock or hex(0),
+            'toBlock': toBlock or 'latest',
         }
-
         if address is not None:
-            json_data['address'] = address_encoder(address)
+            json_data['address'] = address_encoder(normalize_address(address))
 
         if topics is not None:
             if not isinstance(topics, list):
                 raise ValueError('topics must be a list')
-
             json_data['topics'] = [topic_encoder(topic) for topic in topics]
+        
+        #filter_id = self.call('eth_newFilter', json_data)
+        #return quantity_decoder(filter_id)
+        return json_data
 
-        filter_id = self.call('eth_newFilter', json_data)
-        return quantity_decoder(filter_id)
 
-    def filter_changes(self, fid):
-        changes = self.call('eth_getFilterChanges', quantity_encoder(fid))
+    def filter_changes(self, json_data):
+        #changes = self.call('eth_getFilterChanges', quantity_encoder(fid))
+
+        changes = self.call('eth_getLogs', json_data)
 
         if not changes:
-            return None
+            return list()
 
         if isinstance(changes, bytes):
             return data_decoder(changes)
@@ -645,12 +660,48 @@ class JSONRPCClient(object):
             'topics': lambda x: [topic_decoder(t) for t in x],
             'blockNumber': quantity_decoder,
             'logIndex': quantity_decoder,
-            'transactionIndex': quantity_decoder
+            'transactionIndex': quantity_decoder,
+            'removed': bool_decoder
         }
+
         return [
             {k: decoders[k](v) for k, v in c.items() if v is not None}
             for c in changes
         ]
+
+    def poll_contract_events(
+        self,
+        contract_address,
+        translator,
+        fromBlock,
+        condition=None,
+        wait=constant.DEFAULT_RETRY_INTERVAL, timeout=constant.DEFAULT_TIMEOUT):
+        
+        result = list()
+        json_data = self.new_filter(contract_address,fromBlock=fromBlock)
+        
+        for i in range(0, timeout + wait, wait):
+            events = self.filter_changes(json_data)
+            log.info('waiting for transaction events...{}s'.format(i))
+            if events:                
+                for match_log in events:
+                    decoded_event = translator.decode_event(
+                        match_log['topics'],
+                        match_log['data'],
+                    )
+                    if decoded_event is not None:
+                        decoded_event['block_number'] = match_log.get('blockNumber')
+                        decoded_event['transaction_hash'] = data_encoder(match_log.get('transactionHash'))
+                        if not condition or condition(decoded_event):
+                            result.append(decoded_event)
+                        
+                #self.call('eth_uninstallFilter',quantity_encoder(fid))
+                if result !=[]:
+                    return result 
+            if i < timeout:
+                gevent.sleep(wait)
+        #self.call('eth_uninstallFilter',quantity_encoder(fid))
+        return list()
 
     @check_node_connection
     def call(self, method, *args):
@@ -997,7 +1048,7 @@ class JSONRPCClient(object):
             # > will be ignored
             #
             last_result = None
-
+            count = 0
             while True:
                 # Could return None for a short period of time, until the
                 # transaction is added to the pool
@@ -1012,8 +1063,11 @@ class JSONRPCClient(object):
                     break
 
                 last_result = transaction
-
-                gevent.sleep(.5)
+                
+                print 'waiting for transaction to be mined... %3ds\r' % (count),
+                sys.stdout.flush()
+                count = count+1
+                gevent.sleep(1)
 
             if confirmations:
                 # this will wait for both APPLIED and REVERTED transactions
@@ -1023,7 +1077,9 @@ class JSONRPCClient(object):
                 block_number = self.block_number()
 
                 while block_number < confirmation_block:
-                    gevent.sleep(.5)
+                    print 'waiting for transaction confirm... %d/%d \r' % (block_number+confirmations-confirmation_block,confirmations),
+                    sys.stdout.flush()
+                    gevent.sleep(1)
                     block_number = self.block_number()
 
         except gevent.Timeout:

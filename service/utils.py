@@ -84,6 +84,9 @@ def data_decoder(data):
     data = unhexlify(data)
     return data
 
+def bool_decoder(val):
+    assert isinstance(val, bool)
+    return val
 
 def quantity_decoder(data):
     assert data[:2] == '0x'

@@ -126,7 +126,6 @@ class Console(object):
 class ConsoleTools(object):
     def __init__(self, blockchain_service):
         self.blockchain_service = blockchain_service
-        self._api = PYETHAPI(blockchain_service)
 
 
     def wait_for_contract(self, contract_address_hex, timeout=None):

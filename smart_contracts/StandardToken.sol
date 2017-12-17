@@ -48,6 +48,7 @@ contract StandardToken is Token {
         public
         returns (bool)
     {
+        
         require(_to != 0x0);
         require(_value > 0);
         require(balances[msg.sender] >= _value);
@@ -59,14 +60,14 @@ contract StandardToken is Token {
             ContractReceiver receiver = ContractReceiver(_to);
             receiver.tokenFallback(msg.sender, _value, _data);
         }
+        
         Transfer(msg.sender, _to, _value, _data);
         return true;
     }
 
     //assemble the given address bytecode. If bytecode exists then the _addr is a contract.
-    function isContract(
-        address _addr)
-        private
+    function isContract(address _addr)
+        private view
         returns (bool)
     {
         uint length;

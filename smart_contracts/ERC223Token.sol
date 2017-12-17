@@ -38,7 +38,7 @@ contract ERC223Token is StandardToken {
         string _tokenName,
         uint8 _decimalUnits,
         string _tokenSymbol
-        )
+        ) public
     {
         owner = msg.sender;
         multiplier = 10**(uint256(_decimalUnits));

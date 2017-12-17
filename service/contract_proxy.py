@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 from ethereum.abi import ContractTranslator
 from ethereum.utils import normalize_address
-from pyethapi.service.events import (
-    new_filter,
-    Filter,
-)
-from pyethapi.service.events import (
-    BlockchainEvents,
-)
+import custom.custom_contract_events as custom_contract_events
+from ethereum import slogging
+
+log = slogging.getLogger(__name__)  # pylint: disable=invalid-name
+
 class ContractProxy(object):
     """ Exposes a smart contract as a python object.
 
@@ -16,12 +14,14 @@ class ContractProxy(object):
     translation.
     """
 
-    def __init__(self, sender, abi, address, call_func, transact_func, estimate_function=None):
+    def __init__(self, jsonrpc_client,sender, contract_name,abi, address, call_func, transact_func, estimate_function=None):
         sender = normalize_address(sender)
 
+        self.jsonrpc_client = jsonrpc_client
         self.abi = abi
         self.address = address = normalize_address(address)
         self.translator = ContractTranslator(abi)
+        self.contract_name = contract_name
 
         for function_name in self.translator.function_data:
             function_proxy = MethodProxy(
@@ -47,38 +47,29 @@ class ContractProxy(object):
                 function_signature=function_signature,
             )
             setattr(self, function_name, function_proxy)
-
-    def events_filter(self, rpcclient, contract_address, topics, from_block=None, to_block=None):
-            
-        """ Install a new filter for an array of topics emitted by contract.
-        Args:
-            topics (list): A list of event ids to filter for. Can also be None,
-                           in which case all events are queried.
-
-        Return:
-            Filter: The filter instance.
-        """
-        filter_id_raw = new_filter(
-            rpcclient,
-            contract_address,
-            topics=topics,
-            from_block=from_block,
-            to_block=to_block
-        )
-
-        return Filter(
-            rpcclient,
-            filter_id_raw,
-        )
     
-    def all_events_filter(self, from_block=None, to_block=None):
-            """ Install a new filter for all the events emitted by the current contract
-
-        Return:
-            Filter: The filter instance.
+    def poll_contract_event(self, fromBlock,contract_name,event_name,*args):
         """
-        return self.events_filter(None, from_block, to_block)
-
+        reload custom_contract_events module to get latest custom event filters
+        """
+        reload(custom_contract_events)
+        event_key = contract_name+'_'+event_name
+        if event_key in custom_contract_events.__conditionSet__.keys(): 
+            condition = custom_contract_events.__conditionSet__[event_key]
+            event = self.jsonrpc_client.poll_contract_events(
+                self.address,
+                self.translator,
+                fromBlock,
+                condition(*args)
+                )
+            log.info('Polled event(with filter {}): {}'.format(event_key,event))
+        else:
+            event = self.jsonrpc_client.poll_contract_events(
+                self.address,
+                self.translator,
+                fromBlock
+                )
+            log.info('Polled event(without filter): {}'.format(event))
 
 class MethodProxy(object):
     """ A callable interface that exposes a contract function. """
