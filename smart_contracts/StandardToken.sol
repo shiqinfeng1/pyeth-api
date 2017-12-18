@@ -6,7 +6,7 @@ If you deploy this, you won't have anything useful.)
 
 Implements ERC 20 Token standard: https://github.com/ethereum/EIPs/issues/20
 .*/
-pragma solidity ^0.4.8;
+pragma solidity ^0.4.15;
 
 import "./Token.sol";
 import "./ContractReceiver.sol";
@@ -23,7 +23,6 @@ contract StandardToken is Token {
     /*
      *  Public functions
      */
-
     /// @dev Transfers sender's tokens to a given address, added due to backwards compatibility reasons with ERC20
     /// @param _to Address of token receiver.
     /// @param _value Number of tokens to transfer.
@@ -33,9 +32,10 @@ contract StandardToken is Token {
         returns (bool)
     {
         bytes memory empty;
-        return transfer(_to, _value, empty);
+        Transfer(msg.sender, _to, _value, empty);
+        return true;
+        //return transfer(_to, _value, empty);
     }
-
     /// @dev Function that is called when a user or another contract wants to transfer funds.
     /// @param _to Address of token receiver.
     /// @param _value Number of tokens to transfer.

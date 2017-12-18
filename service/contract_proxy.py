@@ -3,7 +3,7 @@ from ethereum.abi import ContractTranslator
 from ethereum.utils import normalize_address
 import custom.custom_contract_events as custom_contract_events
 from ethereum import slogging
-
+from binascii import hexlify, unhexlify
 log = slogging.getLogger(__name__)  # pylint: disable=invalid-name
 
 class ContractProxy(object):
@@ -96,7 +96,7 @@ class MethodProxy(object):
     def transact(self, *args, **kargs):
         assert set(kargs.keys()).issubset(self.valid_kargs)
         data = self.translator.encode(self.function_name, args)
-
+        print('self.function_name, args => data',self.function_name, args, hexlify(data))
         txhash = self.transaction_function(
             sender=self.sender,
             to=self.contract_address,
