@@ -24,7 +24,7 @@ contract TokenExchange is Owned,ContractReceiver{
         address indexed _user,
         uint256 _amount);
 
-    function TokenExchange(address _token) {
+    function TokenExchange(address _token) public {
         require(_token != 0x0);
 
         owner = msg.sender;

@@ -1,4 +1,6 @@
 import os
+import click
+from binascii import hexlify, unhexlify
 from service.blockchain import (
     BlockChainService,
 )
@@ -7,6 +9,7 @@ from service import accounts_manager
 
 from service.utils import (
     address_decoder,
+    split_endpoint,
 )
 from  service.constant import (
     WEI_TO_ETH
@@ -22,14 +25,19 @@ def lock_token(srcTokenProxy, destTokenProxy, TokenExchangeAddress, lockAmount):
     txhash = destTokenProxy.mint(
         srcTokenProxy.sender,lockAmount*WEI_TO_ETH)
 
-def demo():
+@click.command()
+@click.option('--eth', default='localhost:8545', help='<ip:port> of ethereum client.')
+@click.option('--quorum', prompt='localhost:40001', help='<ip:port> of quorum client.')
+def demo(eth,quorum):
     
+    h1,p1=split_endpoint(eth)
+    h2,p2=split_endpoint(quorum)
     """connect to ethereum client"""
     ethereum_proxy = blockchain_service.new_blockchain_proxy(
-        'ethereum_proxy', '192.168.20.141','8545',os.getcwd()+'/keystore')
+        'ethereum_proxy', h1,p1,os.getcwd()+'/keystore')
 
     quorum_proxy = blockchain_service.new_blockchain_proxy(
-        'quorum_proxy', '192.168.20.141','8544',os.getcwd()+'/keystore')
+        'quorum_proxy', h2,p2,os.getcwd()+'/keystore')
     
     """test users"""
     owner =  '0xa1629411f4e8608a7bb88e8a7700f11c59175e72'
@@ -37,13 +45,18 @@ def demo():
     user_2 = '0x5252781539b365e08015fa7ed77af5a36097f39d'
 
     """test transfer eth, executed twice in succession"""
-    ethereum_procy.transfer_eth(
-        sender=owner,to=user_1,eth_amount=123333,password='123456') # first execution needs password to unlock
-    quorum_proxy.transfer_eth(
-        sender=owner,to=user_1,eth_amount=123333)
+    print '111111111111111111111111111111111111111111111111'
+    txhash=ethereum_proxy.transfer_eth(
+        sender=owner,to=user_1,eth_amount=321,password='123456') # first execution needs password to unlock
+    ethereum_proxy.poll_contarct_transaction_result(txhash)
+
+    txhash=quorum_proxy.transfer_eth(
+        sender=owner,to=user_1,eth_amount=123,password='123456')
+    quorum_proxy.poll_contarct_transaction_result(txhash)
 
     """test deploy contract"""
-    ERC223Token_ethereum = ethereum_proxy.deploy_contract( 
+    print '222222222222222222222222222222222222222222222222'
+    ERC223Token_ethereum_owner = ethereum_proxy.deploy_contract( 
         owner, 
         'ERC223Token.sol', 'ERC223Token',
         (100000,'REX',18,'REX Token')
@@ -56,19 +69,21 @@ def demo():
     TokenExchange = ethereum_proxy.deploy_contract( 
         owner, 
         'TokenExchange.sol', 'TokenExchange',
-        (contract_proxy.address)
+        (hexlify(ERC223Token_ethereum_owner.address),)
         )
 
+    print '333333333333333333333333333333333333333333333333'
     """contract operation method 1: get_contract_proxy """
     ERC223Token_etheteum_owner = ethereum_proxy.get_contract_proxy(owner,'ERC223Token')
     block_number = ethereum_proxy.block_number()
     txhash = ERC223Token_etheteum_owner.mint(user_1,1111) #test mint token to user_1
     txhash = ERC223Token_etheteum_owner.transfer(user_2,11*WEI_TO_ETH,'')
     txhash = ERC223Token_etheteum_owner.transfer(user_2,22*WEI_TO_ETH,'')
-    ethereum_proxy.poll_contarct_transaction_result(block_number,ERC223Token_1,txhash,'Minted',user_1) # wait until transaction is comfired
-    ethereum_proxy.poll_contarct_transaction_result(block_number,ERC223Token_1,txhash,'Transfer',user_1,user_2)
+    ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,ERC223Token_etheteum_owner,'Minted',user_1) # wait until transaction is comfired
+    ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,ERC223Token_etheteum_owner,'Transfer',owner,user_2)
 
     """contract operation method 2: attach_contract """
+    print '444444444444444444444444444444444444444444444444'
     TokenExchange_etheteum_owner = ethereum_proxy.attach_contract(
         owner,
         TokenExchange.address,
@@ -80,17 +95,23 @@ def demo():
     
     lock_token(
         ERC223Token_etheteum_user1,
+        ERC223Token_quorum_owner,
         TokenExchange_etheteum_owner.sender, 
-        ERC223Token_quorum_owner
+        4*WEI_TO_ETH
         )
 
     """ test print all accounts & balance """
+    print '5555555555555555555555555555555555555555555555555'
     addresses = list(ethereum_proxy.account_manager.accounts.keys())
     for idx, addr in enumerate(addresses):
-        print("[{:3d}]account: 0x{} \nbalance:{} ETH \nbalance:{} REX"
+        print("[{:3d}]ethereum account: 0x{} \nbalance:{} ETH \nbalance:{} REX"
             .format(idx, addr,
             ethereum_proxy.balance(address_decoder(addr))/WEI_TO_ETH,
-            ERC223Token_1.balanceOf(addr)/WEI_TO_ETH))
+            ERC223Token_ethereum_owner.balanceOf(addr)/WEI_TO_ETH))
+        print("[{:3d}]quorum account: 0x{} \nbalance:{} ETH \nbalance:{} REX"
+            .format(idx, addr,
+            ethereum_proxy.balance(address_decoder(addr))/WEI_TO_ETH,
+            ERC223Token_quorum_owner.balanceOf(addr)/WEI_TO_ETH))
 
 if __name__ == '__main__':
     slogging.configure(':DEBUG')

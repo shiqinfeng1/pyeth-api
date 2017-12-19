@@ -68,15 +68,6 @@ class JSONRPCPollTimeoutException(Exception):
     # FIXME import this from pyethapp.rpc_client once it is implemented
     pass
 
-"""检查交易是否失败"""
-def check_transaction_threw(client, transaction_hash):
-    """Check if the transaction threw or if it executed properly"""
-    encoded_transaction = data_encoder(transaction_hash.decode('hex'))
-    transaction = client.call('eth_getTransactionByHash', encoded_transaction)
-    receipt = client.call('eth_getTransactionReceipt', encoded_transaction)
-    return int(transaction['gas'], 0) == int(receipt['gasUsed'], 0)
-
-
 def check_node_connection(func):
     """ A decorator to reconnect if the connection to the node is lost """
     def retry_on_disconnect(self, *args, **kwargs):
@@ -252,18 +243,27 @@ class BlockChainProxy(object):
             all_contracts[contract_key]['abi'],
             contract_address,
         )
+    
+    """检查交易是否失败"""
+    def check_transaction_threw(self,transaction_hash):
+        """Check if the transaction threw or if it executed properly"""
+        encoded_transaction = data_encoder(transaction_hash.decode('hex'))
+        transaction = self.jsonrpc_client.call('eth_getTransactionByHash', encoded_transaction)
+        receipt = self.jsonrpc_client.call('eth_getTransactionReceipt', encoded_transaction)
+        return int(transaction['gas'], 0) == int(receipt['gasUsed'], 0)
+
     def poll_contarct_transaction_result(self,
-        fromBlock,
-        contract_proxy,
         transaction_hash,
+        fromBlock=None,
+        contract_proxy=None,
         event_name=None,*event_filter_args):
 
-        contract_proxy.jsonrpc_client.poll(
+        self.jsonrpc_client.poll(
             unhexlify(transaction_hash),
             timeout=constant.DEFAULT_POLL_TIMEOUT,
         )
         
-        fail = check_transaction_threw(contract_proxy.jsonrpc_client, transaction_hash)
+        fail = self.check_transaction_threw(transaction_hash)
         if fail:
             log.info('transaction({}) execute failed .'.format(transaction_hash))
             return False
@@ -286,8 +286,7 @@ class BlockChainProxy(object):
 
         path = get_contract_path(contract_file)
 
-        log.info('deploying contract: SENDER: {} ADDRESS: {} FILE: {} ...'
-            .format(sender,contract_name,path))
+        log.info('deploying contract: [{} {}] sender: {} ...'.format(contract_name,constructor_parameters,sender))
 
         contract_proxy = client.deploy_solidity_contract(
             unhexlify(sender[2:]),
@@ -299,7 +298,7 @@ class BlockChainProxy(object):
             gasprice=constant.GAS_PRICE,
             timeout=constant.DEFAULT_POLL_TIMEOUT,
         )
-        log.info('Deploying ok. contract address: {} .'.format(hexlify(contract_proxy.address)))
+        log.info('deploying contract: [{}] ok. address: {} .'.format(contract_name,hexlify(contract_proxy.address)))
         self.contract_owner_proxy[contract_name] = contract_proxy
         return contract_proxy
 
@@ -323,7 +322,7 @@ class BlockChainProxy(object):
         print("Sending {} eth to:".format(eth_amount))
         
         print("  - {}".format(to))
-        client.send_transaction(sender=client.sender, to=to, value=eth_amount * constant.WEI_TO_ETH)
+        return client.send_transaction(sender=client.sender, to=to, value=eth_amount * constant.WEI_TO_ETH)
 
     def estimate_blocktime(self, oldest=256):
         """Calculate a blocktime estimate based on some past blocks.
@@ -682,7 +681,7 @@ class JSONRPCClient(object):
         
         for i in range(0, timeout + wait, wait):
             events = self.filter_changes(json_data)
-            log.info('waiting for transaction events...{}s'.format(i))
+            log.info('waiting for transaction events...{}s\r'.format(i))
             if events:                
                 for match_log in events:
                     decoded_event = translator.decode_event(
@@ -1049,6 +1048,7 @@ class JSONRPCClient(object):
             #
             last_result = None
             count = 0
+            print '\n'
             while True:
                 # Could return None for a short period of time, until the
                 # transaction is added to the pool
@@ -1068,19 +1068,20 @@ class JSONRPCClient(object):
                 sys.stdout.flush()
                 count = count+1
                 gevent.sleep(1)
-
+            print '\n'
             if confirmations:
                 # this will wait for both APPLIED and REVERTED transactions
                 transaction_block = quantity_decoder(transaction['blockNumber'])
                 confirmation_block = transaction_block + confirmations
 
                 block_number = self.block_number()
-
+                print '\n'
                 while block_number < confirmation_block:
                     print 'waiting for transaction confirm... %d/%d \r' % (block_number+confirmations-confirmation_block,confirmations),
                     sys.stdout.flush()
                     gevent.sleep(1)
                     block_number = self.block_number()
+                print '\n'
 
         except gevent.Timeout:
             raise Exception('timeout when polling for transaction')

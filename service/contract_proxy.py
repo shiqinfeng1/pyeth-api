@@ -15,8 +15,8 @@ class ContractProxy(object):
     """
 
     def __init__(self, jsonrpc_client,sender, contract_name,abi, address, call_func, transact_func, estimate_function=None):
-        sender = normalize_address(sender)
-
+        
+        self.sender = sender
         self.jsonrpc_client = jsonrpc_client
         self.abi = abi
         self.address = address = normalize_address(address)
@@ -25,7 +25,7 @@ class ContractProxy(object):
 
         for function_name in self.translator.function_data:
             function_proxy = MethodProxy(
-                sender,
+                normalize_address(sender),
                 address,
                 function_name,
                 self.translator,
@@ -96,7 +96,7 @@ class MethodProxy(object):
     def transact(self, *args, **kargs):
         assert set(kargs.keys()).issubset(self.valid_kargs)
         data = self.translator.encode(self.function_name, args)
-        print('self.function_name, args => data',self.function_name, args, hexlify(data))
+        #print('self.function_name, args => data',self.function_name, args, hexlify(data))
         txhash = self.transaction_function(
             sender=self.sender,
             to=self.contract_address,
