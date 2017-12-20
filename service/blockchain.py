@@ -190,9 +190,9 @@ class BlockChainProxy(object):
         return self.jsonrpc_proxy[sender]
 
     """获取本合约管理服务维护的和合约代理"""
-    def get_contract_proxy(self, sender,contract_name,password=None):
+    def get_contract_proxy(self, attacher,contract_name,password=None):
         
-        client = self.get_jsonrpc_client(sender,password)
+        client = self.get_jsonrpc_client(attacher,password)
         if client == None:
             return
         
@@ -201,7 +201,7 @@ class BlockChainProxy(object):
             log.info("Not found contract proxy. deploy contract {} first.".format(contract_name))
             return None
 
-        if contract_owner == sender:
+        if contract_owner == attacher:
             return contract_owner
         
         contract_proxy = client.new_contract_proxy(
@@ -213,10 +213,10 @@ class BlockChainProxy(object):
 
     """给通过第三方服务部署的合约关联一个合约代理"""
     def attach_contract(self, 
-            sender, contract_address, contract_file, contract_name,
+            attacher, contract_address, contract_file, contract_name,
             password=None):
 
-        client = self.get_jsonrpc_client(sender,password)
+        client = self.get_jsonrpc_client(attacher,password)
         if client == None:
             return
 
@@ -254,7 +254,7 @@ class BlockChainProxy(object):
 
     def poll_contarct_transaction_result(self,
         transaction_hash,
-        fromBlock=None,
+        fromBlock=0,
         contract_proxy=None,
         event_name=None,*event_filter_args):
 
@@ -268,7 +268,7 @@ class BlockChainProxy(object):
             log.info('transaction({}) execute failed .'.format(transaction_hash))
             return False
 
-        if event_name != None:
+        if event_name != None and contract_proxy != None:
             contract_proxy.poll_contract_event(
                 fromBlock,
                 contract_proxy.contract_name,

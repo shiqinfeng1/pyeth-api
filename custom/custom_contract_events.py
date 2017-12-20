@@ -35,9 +35,33 @@ def ERC223Token_Transfer_filter_condition(_from,_to):
 
     return filter
 
+def TokenExchange_LogLockToken_filter_condition(_user):
+    
+    def filter(event):
+        if event['_event_type'] != 'LogLockToken':
+            return False
+        if normalize_address(event['_user']) ==  normalize_address(_user):
+            return True
+        return False
+
+    return filter
+
+def TokenExchange_LogSettleToken_filter_condition(_user):
+    
+    def filter(event):
+        if event['_event_type'] != 'LogSettleToken':
+            return False
+        if normalize_address(event['_user']) ==  normalize_address(_user):
+            return True
+        return False
+
+    return filter
+
 __conditionSet__ = {
     'ERC223Token_Minted': ERC223Token_Minted_filter_condition,
     'ERC223Token_Transfer': ERC223Token_Transfer_filter_condition,
+    'TokenExchange_LogLockToken':TokenExchange_LogLockToken_filter_condition,
+    'TokenExchange_LogSettleToken':TokenExchange_LogSettleToken_filter_condition,
 }
 
 

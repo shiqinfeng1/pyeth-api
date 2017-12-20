@@ -69,7 +69,7 @@ class ContractProxy(object):
                 self.translator,
                 fromBlock
                 )
-            log.info('Polled event(without filter): {}'.format(event))
+            log.info('Polled event(without filter.unknow event_key={}): {}'.format(event_key,event))
 
 class MethodProxy(object):
     """ A callable interface that exposes a contract function. """
