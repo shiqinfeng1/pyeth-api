@@ -32,9 +32,7 @@ contract StandardToken is Token {
         returns (bool)
     {
         bytes memory empty;
-        Transfer(msg.sender, _to, _value, empty);
-        return true;
-        //return transfer(_to, _value, empty);
+        return transfer(_to, _value, empty);
     }
     /// @dev Function that is called when a user or another contract wants to transfer funds.
     /// @param _to Address of token receiver.

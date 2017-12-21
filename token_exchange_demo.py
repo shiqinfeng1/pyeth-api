@@ -115,8 +115,8 @@ def token_exchange(eth,quorum):
 
     block_number = ethereum_proxy.block_number()
     txhash = TokenExchange_ethereum_owner.settleToken(scaner,settleAmount*WEI_TO_ETH)
-    ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,TokenExchange_ethereum_owner,'LogSettleToken',scaner) 
-    gevent.sleep(10)
+    ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,TokenExchange_ethereum_owner,'LogSettleToken',scaner)
+
     print "\n======\n检查最终结果"
     name=['advister','scaner','admin',]
     addresses = list(ethereum_proxy.account_manager.accounts.keys())
