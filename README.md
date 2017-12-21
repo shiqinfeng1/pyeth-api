@@ -25,5 +25,24 @@ pyeth-api runs on Python 2.7, for Pyethapp is only support for Python 2.7.
 1. in the custom/custom_contract_events.py, add your contract event filter condition which needs to be listened 
 1. to be continue...
 
+  start command:
+  ```
+  python  pyethapi --console
+  ```
+  command args:
+  ```
+  --rpc / --no-rpc      Start with or without the RPC server.  [default: True]
+  --console             Start the interactive console
+  --rpccorsdomain TEXT  Comma separated list of domains to accept cross origin
+                        requests.  [default: http://localhost:*/*]
+  --rpcaddress TEXT     "host:port" for the service to listen on.  [default:
+                        0.0.0.0:40001]
+  --gas-price INTEGER   Set the Ethereum transaction's gas price  [default:
+                        20000000000]
+  --keystore-path PATH  If you have a non-standard path for the ethereum
+                        keystore directory provide it using this argument.
+  --help                Show this message and exit.
+  ```
+
 ## thanks
 thanks for projects of Raiden Networks 
