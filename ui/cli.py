@@ -4,11 +4,11 @@ import gevent
 import gevent.monkey
 from gevent import Greenlet
 import signal
-from pyethapi.service import constant 
-from pyethapi.service.utils import (
+from service import constant 
+from service.utils import (
     split_endpoint
 )
-from pyethapi.api.rest import APIServer, RestAPI
+from api.rest import APIServer, RestAPI
 from ethereum import slogging
 
 def toogle_cpu_profiler(raiden):
@@ -108,7 +108,7 @@ def app(keystore_path,
 
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements,unused-argument
 
-    from pyethapi.service.blockchain import BlockChainService
+    from service.blockchain import BlockChainService
 
     blockchain_service = BlockChainService()
 
@@ -119,15 +119,15 @@ def app(keystore_path,
 @options
 @click.pass_context
 def run(ctx, **kwargs):
-    from pyethapi.api.python import PYETHAPI
-    from pyethapi.ui.console import Console
+    from api.python import PYETHAPI
+    from ui.console import Console
 
     if ctx.invoked_subcommand is None:
         print('Welcome to pyeth-api-server!')
         slogging.configure(':DEBUG')
 
         blockchain_proxy = ctx.invoke(app, **kwargs)
-        domain_list = []
+        domain_list = ['*']
         if kwargs['rpccorsdomain']:
             if ',' in kwargs['rpccorsdomain']:
                 for domain in kwargs['rpccorsdomain'].split(','):

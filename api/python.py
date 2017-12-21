@@ -8,8 +8,8 @@ class PYETHAPI(object):
         self.blockchain_service = blockchain_service
 
     @property
-    def address(self):
-        raise NotImplementedError()
+    def adminAddress(self):
+        return self.blockchain_service.adminAddress
 
 
     def get_blockchainlist(self, token_address, partner_address):

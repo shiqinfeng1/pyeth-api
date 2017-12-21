@@ -5,12 +5,12 @@ from flask_cors import CORS
 from webargs.flaskparser import parser
 from pyethapp.jsonrpc import address_encoder
 
-from pyethapi.api.v1.encoding import (
+from api.v1.encoding import (
     HexAddressConverter,
 )
-from pyethapi.api.v1.resources import (
+from api.v1.resources import (
     create_blueprint,
-    BlockchainResource,
+    AddressResource,
 )
 
 class APIServer(object):
@@ -33,6 +33,7 @@ class APIServer(object):
             raise ValueError('Invalid api version: {}'.format(self.rest_api.version))
 
         self.flask_app = Flask(__name__)
+        self.flask_app.debug = True
         if cors_domain_list:
             CORS(self.flask_app, origins=cors_domain_list)
         self._add_default_resources()
@@ -40,7 +41,7 @@ class APIServer(object):
         self.flask_app.register_blueprint(self.blueprint)
 
     def _add_default_resources(self):
-        self.add_resource(BlockchainResource, '/address')
+        self.add_resource(AddressResource, '/adminAddress')
         """
         self.add_resource(ChannelsResource, '/channels')
         self.add_resource(
@@ -80,12 +81,14 @@ class APIServer(object):
 
 class RestAPI(object):
     """
-    This wraps around the actual RaidenAPI in api/python.
+    This wraps around the actual API in api/python.
     It will provide the additional, neccessary RESTful logic and
-    the proper JSON-encoding of the Objects provided by the RaidenAPI
+    the proper JSON-encoding of the Objects provided by the API
     """
     version = 1
 
-    def __init__(self, raiden_api):
-        self.raiden_api = raiden_api
+    def __init__(self, pyeth_api):
+        self.pyeth_api = pyeth_api
 
+    def get_admin_address(self):
+        return {'admin_address': self.pyeth_api.adminAddress}

@@ -126,6 +126,7 @@ class BlockChainService(object):
     
     def __init__(self):      
         self.blockchain_proxy =  dict()
+        self.adminAddress = constant.ADMIN_ADDRESS
 
     def new_blockchain_proxy(self,
             chain_name,

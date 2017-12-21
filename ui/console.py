@@ -19,8 +19,8 @@ from pyethapp.utils import bcolors as bc
 from pyethapp.jsonrpc import default_gasprice
 from pyethapp.console_service import GeventInputHook, SigINTHandler
 
-from pyethapi.api.python import PYETHAPI
-from pyethapi.service.utils import  get_contract_path, safe_address_decode
+from api.python import PYETHAPI
+from service.utils import  get_contract_path, safe_address_decode
 
 # ipython needs to accept "--gui gevent" option
 IPython.core.shellapp.InteractiveShellApp.gui.values += ('gevent',)
@@ -127,35 +127,3 @@ class ConsoleTools(object):
     def __init__(self, blockchain_service):
         self.blockchain_service = blockchain_service
 
-
-    def wait_for_contract(self, contract_address_hex, timeout=None):
-        """Wait until a contract is mined
-        Args:
-            contract_address_hex (string): hex encoded address of the contract
-            timeout (int): time to wait for the contract to get mined
-        Returns:
-            True if the contract got mined, false otherwise
-        """
-        contract_address = safe_address_decode(contract_address_hex)
-        start_time = time.time()
-        result = self._raiden.chain.client.call(
-            'eth_getCode',
-            contract_address,
-            'latest',
-        )
-
-        current_time = time.time()
-        while result == '0x':
-            if timeout and start_time + timeout > current_time:
-                return False
-
-            result = self._raiden.chain.client.call(
-                'eth_getCode',
-                contract_address,
-                'latest',
-            )
-            gevent.sleep(0.5)
-
-            current_time = time.time()
-
-        return result != '0x'

@@ -18,11 +18,30 @@ class BaseResource(Resource):
         self.rest_api = kwargs['rest_api_object']
 
 
-class BlockchainResource(BaseResource):
+class AddressResource(BaseResource):
 
     def __init__(self, **kwargs):
-        super(BlockchainResource, self).__init__(**kwargs)
+        super(AddressResource, self).__init__(**kwargs)
 
     def get(self):
-        return self.rest_api.get_our_address()
+        return self.rest_api.get_admin_address()
 
+"""
+class TransferToTargetResource(BaseResource):
+    
+    post_schema = TransferSchema(
+        exclude=('initiator_address', 'target_address', 'token_address')
+    )
+
+    def __init__(self, **kwargs):
+        super(TransferToTargetResource, self).__init__(**kwargs)
+
+    @use_kwargs(post_schema, locations=('json',))
+    def post(self, token_address, target_address, amount, identifier):
+        return self.rest_api.initiate_transfer(
+            token_address=token_address,
+            target_address=target_address,
+            amount=amount,
+            identifier=identifier,
+        )
+"""
