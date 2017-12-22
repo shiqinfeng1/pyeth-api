@@ -157,7 +157,7 @@ def run(ctx, **kwargs):
             )
 
         if ctx.params['console']:
-            console = Console(blockchain_proxy)
+            console = Console(pyeth_api)
             console.start()
             server2 = Greenlet.spawn(
                 console.run
