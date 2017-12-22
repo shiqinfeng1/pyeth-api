@@ -142,7 +142,7 @@ def run(ctx, **kwargs):
                 cors_domain_list=domain_list,
             )
             (api_host, api_port) = split_endpoint(kwargs['rpcaddress'])
-            Greenlet.spawn(
+            sever1 = Greenlet.spawn(
                 api_server.run,
                 api_port,
                 debug=False,
@@ -159,7 +159,7 @@ def run(ctx, **kwargs):
         if ctx.params['console']:
             console = Console(blockchain_proxy)
             console.start()
-            Greenlet.spawn(
+            sever2 = Greenlet.spawn(
                 console.run
             )
 
@@ -173,14 +173,8 @@ def run(ctx, **kwargs):
         gevent.signal(signal.SIGUSR2, toggle_trace_profiler)
 
         event.wait()
-        """
-        try:
-            api_server.stop()
-        except NameError:
-            pass
-
-        blockchain_proxy.stop()
-        """
+        server1.kill(block=True, timeout=10)
+        server2.kill(block=True, timeout=10)
     else:
         # Pass parsed args on to subcommands.
         ctx.obj = kwargs
