@@ -25,7 +25,6 @@ class AddressResource(BaseResource):
 
     def get(self):
         return self.rest_api.get_admin_address()
-
 """
 class TransferToTargetResource(BaseResource):
     

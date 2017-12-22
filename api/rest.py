@@ -27,7 +27,7 @@ class APIServer(object):
         if self.rest_api.version == 1:
             self.flask_api_context = Api(
                 self.blueprint,
-                prefix="/api/1",
+                prefix="/api/v1",
             )
         else:
             raise ValueError('Invalid api version: {}'.format(self.rest_api.version))

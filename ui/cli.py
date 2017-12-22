@@ -142,7 +142,7 @@ def run(ctx, **kwargs):
                 cors_domain_list=domain_list,
             )
             (api_host, api_port) = split_endpoint(kwargs['rpcaddress'])
-            sever1 = Greenlet.spawn(
+            server1 = Greenlet.spawn(
                 api_server.run,
                 api_port,
                 debug=False,
@@ -159,7 +159,7 @@ def run(ctx, **kwargs):
         if ctx.params['console']:
             console = Console(blockchain_proxy)
             console.start()
-            sever2 = Greenlet.spawn(
+            server2 = Greenlet.spawn(
                 console.run
             )
 

@@ -28,7 +28,7 @@ inputhook_manager.register('gevent')(GeventInputHook)
 
 
 def print_usage():
-    print("\t{}use `{}pyethapi{}` to interact with the pyethapi service.".format(
+    print("\t{}use `{}account{}` to interact with the account manager.".format(
         bc.OKBLUE, bc.HEADER, bc.OKBLUE))
     print("\tuse `{}chain{}` to interact with the blockchain.".format(bc.HEADER, bc.OKBLUE))
     print("\tuse `{}help(<topic>){}` for help on a specific topic.".format(bc.HEADER, bc.OKBLUE))
@@ -44,8 +44,8 @@ class Console(object):
 
     name = 'console'
 
-    def __init__(self, app):
-        self.app = app
+    def __init__(self, pyeth_api):
+        self.pyeth_api = pyeth_api
         self.interrupt = Event()
         self.console_locals = {}
         self.start()
@@ -55,12 +55,9 @@ class Console(object):
         # start console service
 
         self.console_locals = dict(
-            blockchain_service=self.app,
-            tools=ConsoleTools(
-                self.app
+            chain=ChainTools(
+                self.pyeth_api
             ),
-            true=True,
-            false=False,
             usage=print_usage,
         )
 
@@ -123,7 +120,18 @@ class Console(object):
         sys.exit(0)
 
 
-class ConsoleTools(object):
-    def __init__(self, blockchain_service):
-        self.blockchain_service = blockchain_service
+class ChainTools(object):
+    def __init__(self, pyeth_api):
+        self.pyeth_api = pyeth_api
+        self.blockchain_service = pyeth_api.blockchain_service
+
+    def new_blockchain_proxy(self, chain_name,host,port):
+        if self.blockchain_service.blockchain_proxy[chain_name] == None:
+            ethereum_proxy = self.blockchain_service.new_blockchain_proxy(
+                chain_name, host, port, os.getcwd()+'/keystore')
+        return True
+
+    def blockchain_proxy_list(self, host, port):
+        proxy_list = list(self.blockchain_service.blockchain_proxy.keys())
+        print proxy_list
 
