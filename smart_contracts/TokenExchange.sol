@@ -32,7 +32,7 @@ contract TokenExchange is Owned,ContractReceiver{
         token = ERC223Token(_token);
     }
 
-    function lockToken(address _user, uint _amount) internal {
+    function lockToken(address _user, uint _amount) public {
         require(_user != 0x0);
         require (msg.sender == owner || msg.sender == token_address);
 

@@ -14,7 +14,7 @@ from ethereum.utils import encode_hex, normalize_address
 from pyethapp.jsonrpc import (
     data_encoder,
 )
-
+import getpass
 from exceptions import (
     EthNodeCommunicationError,
 )
@@ -155,7 +155,6 @@ class BlockChainService(object):
 
 class BlockChainProxy(object):
     """ Exposes the blockchain's state through JSON-RPC. """
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(
             self,
@@ -179,9 +178,6 @@ class BlockChainProxy(object):
 
     def get_jsonrpc_client(self, sender, password=None):
         if self.jsonrpc_proxy.get(sender) == None:
-            if password == None:
-                log.info("Account {} need unlock first.".format(sender))
-                return None
             private_key = self.account_manager.get_account(sender,password).privkey
             self.jsonrpc_proxy[sender] = JSONRPCClient(
                 host = self.host,
@@ -286,8 +282,9 @@ class BlockChainProxy(object):
             return
 
         path = get_contract_path(contract_file)
-
-        log.info('deploying contract: [{} {}] sender: {} ...'.format(contract_name,constructor_parameters,sender))
+        workdir, filename = os.path.split(path)
+        log.info('deploying contract: [{} {}] sender: {} workdir: {} ...'.format(
+            contract_name,constructor_parameters,sender,workdir))
 
         contract_proxy = client.deploy_solidity_contract(
             unhexlify(sender[2:]),
@@ -750,7 +747,7 @@ class JSONRPCClient(object):
             sender = sender or privkey_address
 
             if sender != privkey_address:
-                raise ValueError('sender for a different privkey.')
+                raise ValueError('sender for a different privkey .')
 
             if nonce is None:
                 nonce = self.nonce(sender)

@@ -6,7 +6,7 @@ import json
 import sys
 import time
 from logging import StreamHandler, Formatter
-
+from flask.json import jsonify
 import gevent
 from gevent.event import Event
 import IPython
@@ -35,6 +35,28 @@ def print_usage():
     print("\ttype `{}usage(){}` to see this help again.".format(bc.HEADER, bc.OKBLUE))
     print("\n" + bc.ENDC)
 
+class ChainTools(object):
+    def __init__(self, pyeth_api):
+        self.pyeth_api = pyeth_api
+        
+    def _print_proxy_info(self,proxy):
+        print("=======================================")
+        print("'chain_name':      {}".format(proxy.chain_name))
+        print("'host':            {}".format(proxy.host))
+        print("'port':            {}".format(proxy.port))
+        print("'keystore_path':   {}".format(proxy.account_manager.keystore_path))
+        print("'default accounts':{}".format(list(proxy.account_manager.accounts.keys())))
+
+    def new_blockchain_proxy(self, chain_name,host,port):
+        proxy = self.pyeth_api.new_blockchain_proxy(chain_name,host,port)
+        self._print_proxy_info(proxy)
+
+    def blockchain_proxy_list(self):
+        for (k,v) in self.pyeth_api.blockchain_proxy_list():
+            self._print_proxy_info(v)
+
+    def deploy_contract(self,atm_address=None):
+        self.pyeth_api.deploy_contract(atm_address)
 
 class Console(object):
 
@@ -53,8 +75,7 @@ class Console(object):
 
     def start(self):
         # start console service
-
-        self.console_locals = dict(
+        self.console_locals  = dict(
             chain=ChainTools(
                 self.pyeth_api
             ),
@@ -70,16 +91,17 @@ class Console(object):
 
         # Remove handlers that log to stderr
         root = getLogger()
+        """
         for handler in root.handlers[:]:
             if isinstance(handler, StreamHandler) and handler.stream == sys.stderr:
                 root.removeHandler(handler)
-
+        """
         stream = cStringIO.StringIO()
         handler = StreamHandler(stream=stream)
-        handler.formatter = Formatter("%(levelname)s:%(name)s %(message)s")
-        root.addHandler(handler)
+        handler.formatter = Formatter("%(levelname)s:%(name)s %(message)s") # 实例化formatter
+        root.addHandler(handler) # 为logger添加handler  
 
-        def lastlog(n=10, prefix=None, level=None):
+        def lastlog(n=30, prefix=None, level=None):
             """Print the last `n` log lines to stdout.
             Use `prefix='p2p'` to filter for a specific logger.
             Use `level=INFO` to filter for a specific level.
@@ -118,20 +140,3 @@ class Console(object):
         self.interrupt.clear()
 
         sys.exit(0)
-
-
-class ChainTools(object):
-    def __init__(self, pyeth_api):
-        self.pyeth_api = pyeth_api
-        self.blockchain_service = pyeth_api.blockchain_service
-
-    def new_blockchain_proxy(self, chain_name,host,port):
-        if self.blockchain_service.blockchain_proxy[chain_name] == None:
-            ethereum_proxy = self.blockchain_service.new_blockchain_proxy(
-                chain_name, host, port, os.getcwd()+'/keystore')
-        return True
-
-    def blockchain_proxy_list(self, host, port):
-        proxy_list = list(self.blockchain_service.blockchain_proxy.keys())
-        print proxy_list
-

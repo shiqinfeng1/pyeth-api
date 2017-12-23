@@ -121,7 +121,9 @@ def app(keystore_path,
 def run(ctx, **kwargs):
     from api.python import PYETHAPI
     from ui.console import Console
-
+    
+    server1 = None
+    server2 = None
     if ctx.invoked_subcommand is None:
         print('Welcome to pyeth-api-server!')
         slogging.configure(':DEBUG')
@@ -173,8 +175,10 @@ def run(ctx, **kwargs):
         gevent.signal(signal.SIGUSR2, toggle_trace_profiler)
 
         event.wait()
-        server1.kill(block=True, timeout=10)
-        server2.kill(block=True, timeout=10)
+        if server1 != None:
+            server1.kill(block=True, timeout=10)
+        if server2 != None:
+            server2.kill(block=True, timeout=10)
     else:
         # Pass parsed args on to subcommands.
         ctx.obj = kwargs

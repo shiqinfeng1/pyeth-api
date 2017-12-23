@@ -31,10 +31,10 @@ def token_exchange(eth,quorum):
 
     print "\n======\n生成链代理"
     ethereum_proxy = blockchain_service.new_blockchain_proxy(
-        'ethereum_proxy', h1,p1,os.getcwd()+'/keystore')
+        'ethereum_proxy', h1,p1,os.getcwd()+'/pyethapi/keystore')
 
     quorum_proxy = blockchain_service.new_blockchain_proxy(
-        'quorum_proxy', h2,p2,os.getcwd()+'/keystore')
+        'quorum_proxy', h2,p2,os.getcwd()+'/pyethapi/keystore')
     
     print "\n======\n配置测试账户"
     admin =  '0xa1629411f4e8608a7bb88e8a7700f11c59175e72'

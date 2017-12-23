@@ -7,6 +7,7 @@ from ethereum import keys
 from bitcoin import privtopub
 import json
 from binascii import hexlify, unhexlify
+from service import constant 
 
 log = slogging.getLogger(__name__)
 
@@ -45,7 +46,6 @@ def find_keystoredir():
 
 class Account(object):
     """Represents an account.  """
-
     def __init__(self, keystore, password=None, path=None):
         """
         Args:
@@ -204,6 +204,7 @@ class Account(object):
         return '<Account(address={address}, id={id})>'.format(address=address, id=self.uuid)
 
 class AccountManager(object):
+   
     def __init__(self, keystore_path=None):
         self.keystore_path = keystore_path
         self.accounts = {}
@@ -226,6 +227,17 @@ class AccountManager(object):
                             if isinstance(ex, IOError):
                                 msg = 'Can not read account file'
                             log.warning('%s %s: %s', msg, fullpath, ex)
+
+        if len(self.accounts):
+            if constant.ADMIN_ADDRESS[2:] in self.accounts.keys():
+                self.admin_account = constant.ADMIN_ADDRESS
+            else:
+                self.admin_account = '0x'+self.accounts.keys()[0]
+        else:
+            self.admin_account = None
+
+    def set_admin_account(self, address):
+        self.admin_account = address
 
     def address_in_keystore(self, address):
         if address is None:
