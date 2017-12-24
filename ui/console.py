@@ -58,6 +58,24 @@ class ChainTools(object):
     def deploy_contract(self,atm_address=None):
         self.pyeth_api.deploy_contract(atm_address)
 
+    def accounts_list(self): 
+        a0,a1,a2 = self.pyeth_api.accounts_list()
+        print('------------------------------------\n[contract addresses]:')
+        for k, v in a0.iteritems():
+            print('{}: {}'.format(k,v))
+        print('------------------------------------\n[ethereum user accounts]:')
+        for k, v in enumerate(a1):
+            print('{}: {}'.format(k,'0x'+v))
+        print('------------------------------------\n[quorum user accounts]:')
+        for k, v in enumerate(a2):
+            print('{}: {}'.format(k,'0x'+v))
+
+    def query_balance(self):
+        result = self.pyeth_api.query_balance(self)
+        print('------------------------------------')
+        for k, v in enumerate(result):
+            print('{}: {}'.format(k,v))
+
 class Console(object):
 
     """A service starting an interactive ipython session when receiving the

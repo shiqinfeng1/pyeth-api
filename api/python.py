@@ -33,6 +33,27 @@ class PYETHAPI(object):
         quorum_proxy = self.blockchain_service.blockchain_proxy['quorum']
         return ethereum_proxy,quorum_proxy
 
+    def accounts_list(self): 
+        contract_Addresses=dict()
+        ethereum_proxy,quorum_proxy = self._get_chain_proxy()
+        ERC20Token_ethereum_owner = ethereum_proxy.get_contract_proxy(
+            ethereum_proxy.account_manager.admin_account,
+            'ATMToken'
+            )
+        TokenExchange_ethereum_owner = ethereum_proxy.get_contract_proxy(
+            ethereum_proxy.account_manager.admin_account,
+            'TokenExchange'
+            )
+        ERC223Token_quorum_owner = quorum_proxy.get_contract_proxy(
+            ethereum_proxy.account_manager.admin_account,
+            'ERC223Token'
+            )
+        contract_Addresses['ATMToken_address'] = ERC20Token_ethereum_owner.address if ERC20Token_ethereum_owner != None else 'NOT deployed'
+        contract_Addresses['TokenExchange_address'] = TokenExchange_ethereum_owner.address if TokenExchange_ethereum_owner != None else 'NOT deployed'
+        contract_Addresses['ERC223Token_address'] = ERC223Token_quorum_owner.address if ERC223Token_quorum_owner != None else 'NOT deployed'
+
+        return contract_Addresses,list(ethereum_proxy.account_manager.accounts.keys()),list(quorum_proxy.account_manager.accounts.keys())
+
     def deploy_contract(self,atm_address=None): 
         
         ethereum_proxy,quorum_proxy = self._get_chain_proxy()
