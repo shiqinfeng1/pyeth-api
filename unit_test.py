@@ -13,7 +13,8 @@ from service.utils import (
     split_endpoint,
 )
 from  service.constant import (
-    WEI_TO_ETH
+    WEI_TO_ETH,
+    ATM_DECIMALS,
 )
 from ethereum import slogging
 
@@ -71,8 +72,8 @@ def demo(eth,quorum):
     ERC223Token_eth_owner = ethereum_proxy.get_contract_proxy(owner,'ERC223Token')
     block_number = ethereum_proxy.block_number()
     txhash = ERC223Token_eth_owner.mint(user_1,1111) #test mint token to user_1
-    txhash = ERC223Token_eth_owner.transfer(user_2,11*WEI_TO_ETH,'')
-    txhash = ERC223Token_eth_owner.transfer(user_2,22*WEI_TO_ETH,'')
+    txhash = ERC223Token_eth_owner.transfer(user_2,11*ATM_DECIMALS,'')
+    txhash = ERC223Token_eth_owner.transfer(user_2,22*ATM_DECIMALS,'')
     ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,ERC223Token_eth_owner,'Minted',user_1) # wait until transaction is comfired
     ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,ERC223Token_eth_owner,'Transfer',owner,user_2)
 
@@ -94,11 +95,11 @@ def demo(eth,quorum):
         print("[{:3d}]ethereum account: 0x{} \nbalance:{} ETH \nbalance:{} REX"
             .format(idx, addr,
             ethereum_proxy.balance(address_decoder(addr))/WEI_TO_ETH,
-            ERC223Token_ethereum_owner.balanceOf(addr)/WEI_TO_ETH))
+            ERC223Token_ethereum_owner.balanceOf(addr)/ATM_DECIMALS))
         print("[{:3d}]quorum account: 0x{} \nbalance:{} ETH \nbalance:{} REX"
             .format(idx, addr,
             ethereum_proxy.balance(address_decoder(addr))/WEI_TO_ETH,
-            ERC223Token_quorum_owner.balanceOf(addr)/WEI_TO_ETH))
+            ERC223Token_quorum_owner.balanceOf(addr)/ATM_DECIMALS))
 
 if __name__ == '__main__':
     slogging.configure(':DEBUG')

@@ -43,8 +43,8 @@ contract TokenExchange is Owned,ContractReceiver{
     function settleToken(address _user, uint _amount) onlyOwner public {
         require(_user != 0x0);
         require(_amount > 0);
-        bytes memory empty;
-        token.transfer(_user,_amount,empty);
+        //bytes memory empty;
+        token.transfer(_user,_amount);
         //fire event
         LogSettleToken(_user,_amount);
     }

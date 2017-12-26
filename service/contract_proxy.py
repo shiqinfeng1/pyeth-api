@@ -25,7 +25,7 @@ class ContractProxy(object):
 
         for function_name in self.translator.function_data:
             function_proxy = MethodProxy(
-                normalize_address(sender),
+                normalize_address(sender,True),
                 address,
                 function_name,
                 self.translator,

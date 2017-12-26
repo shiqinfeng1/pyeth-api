@@ -1,6 +1,12 @@
 import os
 from ethereum.utils import normalize_address
 from binascii import hexlify, unhexlify
+from service.utils import (
+    address_encoder,
+    address_decoder,
+)
+
+from service import constant
 
 class PYETHAPI(object):
     """ CLI interface. """
@@ -38,19 +44,22 @@ class PYETHAPI(object):
         ethereum_proxy,quorum_proxy = self._get_chain_proxy()
         ERC20Token_ethereum_owner = ethereum_proxy.get_contract_proxy(
             ethereum_proxy.account_manager.admin_account,
-            'ATMToken'
+            'ATMToken',
+            readonly=True,
             )
         TokenExchange_ethereum_owner = ethereum_proxy.get_contract_proxy(
             ethereum_proxy.account_manager.admin_account,
-            'TokenExchange'
+            'TokenExchange',
+            readonly=True,
             )
         ERC223Token_quorum_owner = quorum_proxy.get_contract_proxy(
             ethereum_proxy.account_manager.admin_account,
-            'ERC223Token'
+            'ERC223Token',
+            readonly=True,
             )
-        contract_Addresses['ATMToken_address'] = ERC20Token_ethereum_owner.address if ERC20Token_ethereum_owner != None else 'NOT deployed'
-        contract_Addresses['TokenExchange_address'] = TokenExchange_ethereum_owner.address if TokenExchange_ethereum_owner != None else 'NOT deployed'
-        contract_Addresses['ERC223Token_address'] = ERC223Token_quorum_owner.address if ERC223Token_quorum_owner != None else 'NOT deployed'
+        contract_Addresses['ATMToken_address'] = address_encoder(ERC20Token_ethereum_owner.address) if ERC20Token_ethereum_owner != None else 'NOT deployed'
+        contract_Addresses['TokenExchange_address'] = address_encoder(TokenExchange_ethereum_owner.address) if TokenExchange_ethereum_owner != None else 'NOT deployed'
+        contract_Addresses['ERC223Token_address'] = address_encoder(ERC223Token_quorum_owner.address) if ERC223Token_quorum_owner != None else 'NOT deployed'
 
         return contract_Addresses,list(ethereum_proxy.account_manager.accounts.keys()),list(quorum_proxy.account_manager.accounts.keys())
 
@@ -61,7 +70,7 @@ class PYETHAPI(object):
         ERC223Token_quorum_owner = quorum_proxy.deploy_contract( 
             quorum_proxy.account_manager.admin_account, 
             'ERC223Token.sol', 'ERC223Token',
-            (100000,'REX',18,'REX Token'),
+            (100000,'REX',8,'REX Token'),
             )
 
         if atm_address == None:
@@ -81,9 +90,43 @@ class PYETHAPI(object):
             'TokenExchange.sol', 'TokenExchange',
             (hexlify(atm_address),)
             )
+    def transfer_eth(self,sender,to,amount):
+        _,quorum_proxy = self._get_chain_proxy()
+        contract_proxy = quorum_proxy.get_contract_proxy(
+            sender,
+            'ERC223Token'
+        )
+    def transfer_token_quorum(self,sender,to,amount):
+        _,quorum_proxy = self._get_chain_proxy()
+        contract_proxy = quorum_proxy.get_contract_proxy(
+            sender,
+            'ERC223Token'
+        )
+        block_number = quorum_proxy.block_number()
+        txhash = contract_proxy.transfer(to,amount*constant.ATM_DECIMALS,'')
+        quorum_proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Transfer',to)
 
-        
-    def lock_token(self,adviser,lock_amount):
+    def transfer_token_ethereum(self,sender,to,amount):
+        ethereum_proxy,_ = self._get_chain_proxy()
+        contract_proxy = ethereum_proxy.get_contract_proxy(
+            sender,
+            'ATMToken'
+        )
+        block_number = ethereum_proxy.block_number()
+        txhash = contract_proxy.transfer(to,amount*constant.ATM_DECIMALS)
+        ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Transfer',to)
+    
+    def mint_token_quorum(self,to,amount):
+        _,quorum_proxy = self._get_chain_proxy()
+        ERC223Token_quorum_owner = quorum_proxy.get_contract_proxy(
+            quorum_proxy.account_manager.admin_account,
+            'ERC223Token'
+            )
+        block_number = quorum_proxy.block_number()
+        txhash = ERC223Token_ethereum_owner.mint(to,1111)
+        quorum_proxy.poll_contarct_transaction_result(txhash,block_number,ERC223Token_quorum_owner,'Minted',to)
+
+    def lock_token(self,advertiser,lock_amount):
         
         ethereum_proxy,quorum_proxy = self._get_chain_proxy()
 
@@ -96,7 +139,7 @@ class PYETHAPI(object):
             'TokenExchange'
             )
         ERC20Token_ethereum_advister = ethereum_proxy.get_contract_proxy(
-            adviser,
+            advertiser,
             'ATMToken'
             )
         ERC223Token_quorum_owner = quorum_proxy.get_contract_proxy(
@@ -105,20 +148,20 @@ class PYETHAPI(object):
             )
         block_number = ethereum_proxy.block_number()
         txhash = ERC20Token_ethereum_advister.transfer(
-            TokenExchange_ethereum_owner.address,lock_amount*WEI_TO_ETH)
+            TokenExchange_ethereum_owner.address,lock_amount*constant.ATM_DECIMALS)
         ethereum_proxy.poll_contarct_transaction_result(
             txhash,block_number,ERC20Token_ethereum_advister,'Transfer',TokenExchange_ethereum_owner.address)
 
         block_number = ethereum_proxy.block_number()
         txhash = TokenExchange_ethereum_owner.lockToken(
-            normalize_address(adviser),lock_amount*WEI_TO_ETH)
+            normalize_address(advertiser),lock_amount*constant.ATM_DECIMALS)
         ethereum_proxy.poll_contarct_transaction_result(
-            txhash,block_number,TokenExchange_ethereum_owner,'LogLockToken',advister)
+            txhash,block_number,TokenExchange_ethereum_owner,'LogLockToken',advertiser)
 
         block_number = quorum_proxy.block_number()
-        txhash = ERC223Token_quorum_owner.mint(advister,lock_amount)
+        txhash = ERC223Token_quorum_owner.mint(advertiser,lock_amount)
         quorum_proxy.poll_contarct_transaction_result(
-            txhash,block_number,ERC223Token_quorum_owner,'Minted',advister) 
+            txhash,block_number,ERC223Token_quorum_owner,'Minted',advertiser) 
 
     def settle_token(self,scaner,settle_amount):
         
@@ -129,7 +172,7 @@ class PYETHAPI(object):
             'ERC223Token'
             )
 
-        if settle_amount > ERC223Token_quorum_owner.balanceOf(scaner)/WEI_TO_ETH:
+        if settle_amount > ERC223Token_quorum_owner.balanceOf(scaner)/constant.ATM_DECIMALS:
             raise ValueError('insufficient token balance of {}'.format(scaner))
 
         ERC223Token_quorum_scaner = quorum_proxy.get_contract_proxy(
@@ -143,12 +186,12 @@ class PYETHAPI(object):
 
         block_number = quorum_proxy.block_number()
         txhash = ERC223Token_quorum_scaner.transfer(
-            BLACKHOLE_ADDRESS,settle_amount*WEI_TO_ETH,'')
+            constant.BLACKHOLE_ADDRESS,settle_amount*constant.ATM_DECIMALS,'')
         quorum_proxy.poll_contarct_transaction_result(
-            txhash,block_number,ERC223Token_quorum_scaner,'Transfer',scaner,BLACKHOLE_ADDRESS)
+            txhash,block_number,ERC223Token_quorum_scaner,'Transfer',scaner,constant.BLACKHOLE_ADDRESS)
 
         block_number = ethereum_proxy.block_number()
-        txhash = TokenExchange_ethereum_owner.settleToken(scaner,settle_amount*WEI_TO_ETH)
+        txhash = TokenExchange_ethereum_owner.settleToken(scaner,settle_amount*constant.ATM_DECIMALS)
         ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,TokenExchange_ethereum_owner,'LogSettleToken',scaner)
 
     def query_balance(self,account):
@@ -158,23 +201,26 @@ class PYETHAPI(object):
 
         ERC20Token_ethereum_owner = ethereum_proxy.get_contract_proxy(
             ethereum_proxy.account_manager.admin_account,
-            'ATMToken'
+            'ATMToken',
+            '123456',
             )
+
         ERC223Token_quorum_owner = quorum_proxy.get_contract_proxy(
             ethereum_proxy.account_manager.admin_account,
-            'ERC223Token'
+            'ERC223Token',
+            '123456',
             )
 
         temp = ethereum_proxy.balance(address_decoder(account))
-        result['eth_b'] = temp/WEI_TO_ETH+temp%WEI_TO_ETH
+        result['ETH balance in ethereum'] = float(temp)/constant.WEI_TO_ETH
 
-        temp = ERC20Token_ethereum_owner.balanceOf(account)
-        result['eth_atm_b'] = temp/WEI_TO_ETH+temp%WEI_TO_ETH
+        temp = ERC20Token_ethereum_owner.balanceOf(account) if ERC20Token_ethereum_owner != None else 0
+        result['ATM balance in ethereum'] = float(temp)/constant.ATM_DECIMALS 
     
-        temp = quorum_proxy.balance(address_decoder(addr))
-        result['quo_b'] = temp/WEI_TO_ETH+temp%WEI_TO_ETH
+        temp = quorum_proxy.balance(address_decoder(account))
+        result['ETH balance in quorum'] = float(temp)/constant.WEI_TO_ETH
         
-        temp = ERC223Token_quorum_owner.balanceOf(addr)
-        result['quo_atm_b'] = temp/WEI_TO_ETH+temp%WEI_TO_ETH
+        temp = ERC223Token_quorum_owner.balanceOf(account) if ERC223Token_quorum_owner != None else 0
+        result['ATM balance in quorum'] = float(temp)/constant.ATM_DECIMALS
     
         return result

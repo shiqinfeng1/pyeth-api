@@ -63,6 +63,7 @@ class ChainTools(object):
         print('------------------------------------\n[contract addresses]:')
         for k, v in a0.iteritems():
             print('{}: {}'.format(k,v))
+            print('|--owner: {}'.format(self.pyeth_api.adminAddress))
         print('------------------------------------\n[ethereum user accounts]:')
         for k, v in enumerate(a1):
             print('{}: {}'.format(k,'0x'+v))
@@ -70,11 +71,29 @@ class ChainTools(object):
         for k, v in enumerate(a2):
             print('{}: {}'.format(k,'0x'+v))
 
-    def query_balance(self):
-        result = self.pyeth_api.query_balance(self)
+    def query_balance(self,account):
+        result = self.pyeth_api.query_balance(account)
         print('------------------------------------')
-        for k, v in enumerate(result):
-            print('{}: {}'.format(k,v))
+        for key in sorted(result.keys()):
+            print('{:<30}: {:,}'.format(key, result[key]))
+
+    def lock_token(self,adviser,lock_amount):
+        self.pyeth_api.lock_token(adviser,lock_amount)
+
+    def settle_token(self,scaner,settle_amount):
+        self.pyeth_api.settle_token(scaner,settle_amount)
+
+    def transfer_token(self,chain_name,sender,to,amount):
+        if chain_name == 'quorum':
+            self.pyeth_api.transfer_token_quorum(sender,to,amount)
+        elif chain_name == 'ethereum':
+            self.pyeth_api.transfer_token_ethereum(sender,to,amount)
+        else:
+            print('unkonw chain name: {}'.format(chain_name))
+            return
+
+    def mint_token(self,to,amount):
+        self.pyeth_api.mint_token_quorum(to,amount)
 
 class Console(object):
 

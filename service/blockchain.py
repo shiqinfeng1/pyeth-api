@@ -187,11 +187,13 @@ class BlockChainProxy(object):
         return self.jsonrpc_proxy[sender]
 
     """获取本合约管理服务维护的和合约代理"""
-    def get_contract_proxy(self, attacher,contract_name,password=None):
-        
-        client = self.get_jsonrpc_client(attacher,password)
-        if client == None:
-            return
+    def get_contract_proxy(self, attacher,contract_name,password=None,readonly=False):
+        if readonly:
+            client = self.jsonrpc_client
+        else:
+            client = self.get_jsonrpc_client(attacher,password)
+
+        assert client != None
         
         contract_owner = self.contract_owner_proxy.get(contract_name)
         if contract_owner == None:
@@ -206,6 +208,7 @@ class BlockChainProxy(object):
             contract_owner.abi,
             contract_owner.address,
         )
+        assert contract_proxy != None
         return contract_proxy
 
     """给通过第三方服务部署的合约关联一个合约代理"""
@@ -393,7 +396,7 @@ class JSONRPCClient(object):
         if privkey != '':
             self.sender = privatekey_to_address(privkey)
         else:
-            self.sender = None
+            self.sender = ''
         self.nonce_last_update = 0
         self.nonce_current_value = None
         self.nonce_lock = Semaphore()

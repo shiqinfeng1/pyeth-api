@@ -14,12 +14,13 @@ from service.utils import (
     split_endpoint,
 )
 from  service.constant import (
-    WEI_TO_ETH
+    WEI_TO_ETH,
+    ATM_DECIMALS,
+    BLACKHOLE_ADDRESS,
 )
 from ethereum import slogging
 
 blockchain_service = BlockChainService()
-BLACKHOLE_ADDRESS= '0x0000000000000000000000000000000000000009'
 
 @click.command()
 @click.option('--eth', default='localhost:8545', help='<ip:port> of ethereum client.')
@@ -76,7 +77,7 @@ def token_exchange(eth,quorum):
     print "\n======\nadviser进行锁定操作: 将 11 个token发给TokenExchange合约"
     block_number = ethereum_proxy.block_number()
     txhash = ERC223Token_eth_advister.transfer(
-        TokenExchange_ethereum_owner.address,11*WEI_TO_ETH,'')
+        TokenExchange_ethereum_owner.address,11*ATM_DECIMALS,'')
     ethereum_proxy.poll_contarct_transaction_result(
         txhash,block_number,TokenExchange_ethereum_owner,'LogLockToken',advister)
     
@@ -95,13 +96,13 @@ def token_exchange(eth,quorum):
     print "\n======\nadvister分发3个token给扫码者"
     block_number = quorum_proxy.block_number()
     txhash = ERC223Token_quorum_advister.transfer(
-        scaner,3*WEI_TO_ETH,'')
+        scaner,3*ATM_DECIMALS,'')
     quorum_proxy.poll_contarct_transaction_result(
         txhash,block_number,ERC223Token_quorum_advister,'Transfer',advister,scaner)
 
     print "\n======\n扫码者结算2个token"
     settleAmount = 2
-    if settleAmount > ERC223Token_quorum_owner.balanceOf(scaner)/WEI_TO_ETH:
+    if settleAmount > ERC223Token_quorum_owner.balanceOf(scaner)/ATM_DECIMALS:
         raise ValueError('insufficient token balance of {}'.format(scaner))
     ERC223Token_quorum_scaner = quorum_proxy.attach_contract(
         scaner,
@@ -109,12 +110,12 @@ def token_exchange(eth,quorum):
         'ERC223Token.sol','ERC223Token','123456')
     block_number = quorum_proxy.block_number()
     txhash = ERC223Token_quorum_scaner.transfer(
-        BLACKHOLE_ADDRESS,settleAmount*WEI_TO_ETH,'')
+        BLACKHOLE_ADDRESS,settleAmount*ATM_DECIMALS,'')
     quorum_proxy.poll_contarct_transaction_result(
         txhash,block_number,ERC223Token_quorum_scaner,'Transfer',scaner,BLACKHOLE_ADDRESS)
 
     block_number = ethereum_proxy.block_number()
-    txhash = TokenExchange_ethereum_owner.settleToken(scaner,settleAmount*WEI_TO_ETH)
+    txhash = TokenExchange_ethereum_owner.settleToken(scaner,settleAmount*ATM_DECIMALS)
     ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,TokenExchange_ethereum_owner,'LogSettleToken',scaner)
 
     print "\n======\n检查最终结果"
@@ -124,16 +125,16 @@ def token_exchange(eth,quorum):
         print("[{:2d} {}]ethereum account: 0x{} \nbalance:{} ETH \nbalance:{} REX"
             .format(idx, name[idx], addr,
             ethereum_proxy.balance(address_decoder(addr))/WEI_TO_ETH,
-            ERC223Token_ethereum_owner.balanceOf(addr)/WEI_TO_ETH))
+            ERC223Token_ethereum_owner.balanceOf(addr)/ATM_DECIMALS))
         print("[{:2d} {}]quorum account: 0x{} \nbalance:{} ETH \nbalance:{} REX"
             .format(idx, name[idx], addr,
             quorum_proxy.balance(address_decoder(addr))/WEI_TO_ETH,
-            ERC223Token_quorum_owner.balanceOf(addr)/WEI_TO_ETH))
+            ERC223Token_quorum_owner.balanceOf(addr)/ATM_DECIMALS))
     
     print("[TokenExchange] {} \nbalance:{} ETH \nbalance:{} REX"
             .format(address_encoder(TokenExchange_ethereum_owner.address),
             ethereum_proxy.balance(TokenExchange_ethereum_owner.address)/WEI_TO_ETH,
-            ERC223Token_ethereum_owner.balanceOf(TokenExchange_ethereum_owner.address)/WEI_TO_ETH))
+            ERC223Token_ethereum_owner.balanceOf(TokenExchange_ethereum_owner.address)/ATM_DECIMALS))
     
 if __name__ == '__main__':
     slogging.configure(':DEBUG')
