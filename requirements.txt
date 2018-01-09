@@ -11,3 +11,4 @@ flask
 flask_restful
 flask_cors
 webargs
+python-twitter
