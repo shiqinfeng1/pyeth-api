@@ -260,6 +260,3 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
         result['ATM balance in quorum'] = float(temp)/constant.ATM_DECIMALS
     
         return result
-
-class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
-    pass

@@ -11,7 +11,7 @@ from service.utils import (
 from api.rest import APIServer, RestAPI
 from ethereum import slogging
 from api.python import PYETHAPI
-from api.python import PYETHAPI_ATMCHAIN_REWARDS_PLAN
+from applications.twitter_rewards_plan.twitter_rewards_plan import PYETHAPI_ATMCHAIN_REWARDS_PLAN
 from api.python import PYETHAPI_ATMCHAIN
 from ui.console import Console
 
