@@ -43,21 +43,24 @@ def print_basicinfo():
 
 class TwitterMonitor(object):
     
-    
     def __init__(self):
         #print_basicinfo()
-        gevent.spawn(self.run)
         self.scan_delay = 5
         self.is_stopped = False
-
+        gevent.joinall([gevent.spawn(self.run)])
+        
     def run(self):
+        print('satrt monitor...')
         while not self.is_stopped:
+            print('1')
             gevent.sleep(self.scan_delay)
+            print('2')
             statuses = twitter_api.GetUserTimeline(screen_name=screen_name)
             for s in statuses:
                 log.info('[history messgae id=%s]: %s\n'%(s.id,s.text))
-                log.info('retweet users: {}'.format(twitter_api.GetRetweeters(s.id)))
+                log.info('retweet users: %s'%(twitter_api.GetRetweeters(s.id)))
 
 if __name__ == '__main__':
     #print_basicinfo()
-    TwitterMonitor()
+    a = TwitterMonitor()
+
