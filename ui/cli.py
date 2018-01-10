@@ -10,6 +10,15 @@ from service.utils import (
 )
 from api.rest import APIServer, RestAPI
 from ethereum import slogging
+from api.python import PYETHAPI
+from api.python import PYETHAPI_ATMCHAIN_REWARDS_PLAN
+from api.python import PYETHAPI_ATMCHAIN
+from ui.console import Console
+
+pyethapi = dict()
+pyethapi['default'] = PYETHAPI
+pyethapi['atmchain'] = PYETHAPI_ATMCHAIN
+pyethapi['atmchain_rewards_plan'] = PYETHAPI_ATMCHAIN_REWARDS_PLAN
 
 def toogle_cpu_profiler(raiden):
     try:
@@ -81,11 +90,20 @@ OPTIONS = [
         is_flag=True
     ),
     click.option(
-        '--rpc/--no-rpc',
+        '--rpc',
         help=(
             'Start with or without the RPC server.'
         ),
         default=True,
+        show_default=True,
+    ),
+    click.option(
+        '--inst',
+        help=(
+            'Start with specified business.'
+        ),
+        default='atmchain',
+        type=str,
         show_default=True,
     ),
 ]
@@ -104,7 +122,8 @@ def app(keystore_path,
         rpccorsdomain,
         rpcaddress,
         rpc,
-        console):
+        console,
+        inst):
 
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements,unused-argument
 
@@ -114,20 +133,24 @@ def app(keystore_path,
 
     return blockchain_service
 
+def  _get_pyeth_api(inst,blockchain_proxy):
+    if inst in pyethapi.keys():
+        pyeth_api = pyethapi[inst](blockchain_proxy)
+    else:
+        pyeth_api = pyethapi['default'](blockchain_proxy)
+    return pyeth_api
 
 @click.group(invoke_without_command=True)
 @options
 @click.pass_context
 def run(ctx, **kwargs):
-    from api.python import PYETHAPI
-    from ui.console import Console
     
     server1 = None
     server2 = None
+    pyeth_api = None
     if ctx.invoked_subcommand is None:
         print('Welcome to pyeth-api-server!')
         slogging.configure(':DEBUG')
-
         blockchain_proxy = ctx.invoke(app, **kwargs)
         domain_list = ['*']
         if kwargs['rpccorsdomain']:
@@ -137,7 +160,8 @@ def run(ctx, **kwargs):
             else:
                 domain_list.append(str(kwargs['rpccorsdomain']))
         if ctx.params['rpc']:
-            pyeth_api = PYETHAPI(blockchain_proxy)
+            if pyeth_api == None:
+                pyeth_api = _get_pyeth_api(kwargs['inst'],blockchain_proxy)
             rest_api = RestAPI(pyeth_api)
             api_server = APIServer(
                 rest_api,
@@ -159,6 +183,8 @@ def run(ctx, **kwargs):
             )
 
         if ctx.params['console']:
+            if pyeth_api == None:
+                pyeth_api = _get_pyeth_api(kwargs['inst'],blockchain_proxy)
             console = Console(pyeth_api)
             console.start()
             server2 = Greenlet.spawn(

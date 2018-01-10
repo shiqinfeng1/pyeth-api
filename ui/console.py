@@ -27,7 +27,7 @@ IPython.core.shellapp.InteractiveShellApp.gui.values += ('gevent',)
 inputhook_manager.register('gevent')(GeventInputHook)
 
 
-def print_usage():
+def ATMChain_print_usage():
     print("\t{}use `{}account{}` to interact with the account manager.".format(
         bc.OKBLUE, bc.HEADER, bc.OKBLUE))
     print("\tuse `{}chain{}` to interact with the blockchain.".format(bc.HEADER, bc.OKBLUE))
@@ -35,7 +35,7 @@ def print_usage():
     print("\ttype `{}usage(){}` to see this help again.".format(bc.HEADER, bc.OKBLUE))
     print("\n" + bc.ENDC)
 
-class ChainTools(object):
+class ATMChainTools(object):
     def __init__(self, pyeth_api):
         self.pyeth_api = pyeth_api
         
@@ -55,8 +55,8 @@ class ChainTools(object):
         for (k,v) in self.pyeth_api.blockchain_proxy_list():
             self._print_proxy_info(v)
 
-    def deploy_contract(self,atm_address=None):
-        self.pyeth_api.deploy_contract(atm_address)
+    def deploy_ATM_contract(self,atm_address=None):
+        self.pyeth_api.deploy_ATM_contract(atm_address)
 
     def accounts_list(self): 
         a0,a1,a2 = self.pyeth_api.accounts_list()
@@ -72,29 +72,26 @@ class ChainTools(object):
             print('{}: {}'.format(k,'0x'+v))
 
     def query_balance(self,account):
-        result = self.pyeth_api.query_balance(account)
+        result = self.pyeth_api.query_balance('ethereum','quorum',account)
         print('------------------------------------')
         for key in sorted(result.keys()):
             print('{:<30}: {:,}'.format(key, result[key]))
 
-    def lock_token(self,adviser,lock_amount):
-        self.pyeth_api.lock_token(adviser,lock_amount)
+    def lock_ATM(self,adviser,lock_amount):
+        self.pyeth_api.lock_ATM('ethereum','quorum',adviser,lock_amount)
 
-    def settle_token(self,scaner,settle_amount):
-        self.pyeth_api.settle_token(scaner,settle_amount)
+    def settle_ATM(self,scaner,settle_amount):
+        self.pyeth_api.settle_ATM('ethereum','quorum',scaner,settle_amount)
 
-    def transfer_token(self,chain_name,sender,to,amount):
+    def transfer_ATM(self,chain_name,sender,to,amount):
         if chain_name == 'quorum':
-            self.pyeth_api.transfer_token_quorum(sender,to,amount)
+            self.pyeth_api.transfer_ATM(chain_name,'ERC223Token',sender,to,amount,True)
         elif chain_name == 'ethereum':
-            self.pyeth_api.transfer_token_ethereum(sender,to,amount)
+            self.pyeth_api.transfer_ATM(chain_name,'ERC20Token',sender,to,amount)
         else:
             print('unkonw chain name: {}'.format(chain_name))
             return
-
-    def mint_token(self,to,amount):
-        self.pyeth_api.mint_token_quorum(to,amount)
-
+        
 class Console(object):
 
     """A service starting an interactive ipython session when receiving the
@@ -113,10 +110,10 @@ class Console(object):
     def start(self):
         # start console service
         self.console_locals  = dict(
-            chain=ChainTools(
+            chain=ATMChainTools(
                 self.pyeth_api
             ),
-            usage=print_usage,
+            ATMChainUsage=ATMChain_print_usage,
         )
 
     def run(self):
@@ -124,7 +121,7 @@ class Console(object):
         print('\n' * 2)
         print("Entering Console" + bc.OKGREEN)
         print("Tip:" + bc.OKBLUE)
-        print_usage()
+        ATMChain_print_usage()
 
         # Remove handlers that log to stderr
         root = getLogger()
