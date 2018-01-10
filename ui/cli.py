@@ -20,36 +20,36 @@ pyethapi['default'] = PYETHAPI
 pyethapi['atmchain'] = PYETHAPI_ATMCHAIN
 pyethapi['atmchain_rewards_plan'] = PYETHAPI_ATMCHAIN_REWARDS_PLAN
 
-def toogle_cpu_profiler(raiden):
+def toogle_cpu_profiler(atmchain):
     try:
-        from raiden.utils.profiling.cpu import CpuProfiler
+        from atmchain.utils.profiling.cpu import CpuProfiler
     except ImportError:
         slogging.get_logger(__name__).exception('cannot start cpu profiler')
         return
 
-    if hasattr(raiden, 'profiler') and isinstance(raiden.profiler, CpuProfiler):
-        raiden.profiler.stop()
-        raiden.profiler = None
+    if hasattr(atmchain, 'profiler') and isinstance(atmchain.profiler, CpuProfiler):
+        atmchain.profiler.stop()
+        atmchain.profiler = None
 
-    elif not hasattr(raiden, 'profiler') and raiden.config['database_path'] != ':memory:':
-        raiden.profiler = CpuProfiler(raiden.config['database_path'])
-        raiden.profiler.start()
+    elif not hasattr(atmchain, 'profiler') and atmchain.config['database_path'] != ':memory:':
+        atmchain.profiler = CpuProfiler(atmchain.config['database_path'])
+        atmchain.profiler.start()
 
 
-def toggle_trace_profiler(raiden):
+def toggle_trace_profiler(atmchain):
     try:
-        from raiden.utils.profiling.trace import TraceProfiler
+        from atmchain.utils.profiling.trace import TraceProfiler
     except ImportError:
         slogging.get_logger(__name__).exception('cannot start tracer profiler')
         return
 
-    if hasattr(raiden, 'profiler') and isinstance(raiden.profiler, TraceProfiler):
-        raiden.profiler.stop()
-        raiden.profiler = None
+    if hasattr(atmchain, 'profiler') and isinstance(atmchain.profiler, TraceProfiler):
+        atmchain.profiler.stop()
+        atmchain.profiler = None
 
-    elif not hasattr(raiden, 'profiler') and raiden.config['database_path'] != ':memory:':
-        raiden.profiler = TraceProfiler(raiden.config['database_path'])
-        raiden.profiler.start()
+    elif not hasattr(atmchain, 'profiler') and atmchain.config['database_path'] != ':memory:':
+        atmchain.profiler = TraceProfiler(atmchain.config['database_path'])
+        atmchain.profiler.start()
 
 
 
@@ -185,6 +185,7 @@ def run(ctx, **kwargs):
         if ctx.params['console']:
             if pyeth_api == None:
                 pyeth_api = _get_pyeth_api(kwargs['inst'],blockchain_proxy)
+
             console = Console(pyeth_api)
             console.start()
             server2 = Greenlet.spawn(
