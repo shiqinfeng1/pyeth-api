@@ -81,6 +81,10 @@ class PYETHAPI(object):
         _proxy = self._get_chain_proxy(chain_name)
 
 class PYETHAPI_ATMCHAIN(PYETHAPI):
+    def __init__(self,blockchain_service):
+        print('init PYETHAPI_ATMCHAIN ...')
+        super(PYETHAPI_ATMCHAIN, self).__init__(blockchain_service)
+        
     def accounts_list(self): 
         contract_Addresses=dict()
         ethereum_proxy = self._get_chain_proxy('ethereum')
