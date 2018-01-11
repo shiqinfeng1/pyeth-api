@@ -2,9 +2,11 @@
 import sys
 import twitter
 import gevent
+from gevent.event import Event
+import signal
 import time
 import threading
-
+sys.path.append('../../')
 from api.python import PYETHAPI_ATMCHAIN
 from ethereum import slogging
 log = slogging.getLogger(__name__)
@@ -56,11 +58,8 @@ class TwitterMonitor(object):
         self.scan_delay1 = 3
         self.scan_delay2 = 5
         self.is_stopped = False
-        t = threading.Thread(target=self.run_thread)
-        t.setDaemon(True)
-        t.start()
         
-    def run_thread(self):
+    def run_task(self):
         gevent.joinall([
             gevent.spawn(self.run_monitor_retweet),
             gevent.spawn(self.run_monitor_followers)
@@ -74,8 +73,8 @@ class TwitterMonitor(object):
             try:
                 statuses = twitter_api.GetUserTimeline(screen_name=screen_name)
                 for s in statuses:
-                    log.info('[history messgae id=%s]: %s\n'%(s.id,s.text))
-                    log.info('retweet users: %s'%(twitter_api.GetRetweeters(s.id)))
+                    print('[history messgae id=%s]: %s\n'%(s.id,s.text))
+                    print('retweet users: {}'.format(twitter_api.GetRetweeters(s.id)))
             except:
                 info=sys.exc_info()  
                 print info[0],":",info[1]
@@ -89,13 +88,24 @@ class TwitterMonitor(object):
             try:
                 statuses = twitter_api.GetUserTimeline(screen_name=screen_name)
                 for s in statuses:
-                    log.info('[history messgae id=%s]: %s\n'%(s.id,s.text))
-                    log.info('retweet users: %s'%(twitter_api.GetRetweeters(s.id)))
+                    print('[history messgae id=%s]: %s\n'%(s.id,s.text))
+                    print('retweet users: {}'.format(twitter_api.GetRetweeters(s.id)))
             except:
                 info=sys.exc_info()  
                 print info[0],":",info[1]
                 pass
 
-
-twitter_monitor = TwitterMonitor()
+if __name__ == '__main__':
+    twitter_monitor = TwitterMonitor()
+    twitter_monitor.run_task()
+    event = Event()
+    gevent.signal(signal.SIGQUIT, event.set)
+    gevent.signal(signal.SIGTERM, event.set)
+    gevent.signal(signal.SIGINT, event.set)
+    event.wait()
+else:
+    twitter_monitor = TwitterMonitor()
+    t = threading.Thread(target=twitter_monitor.run_task)
+    t.setDaemon(True)
+    t.start()
 
