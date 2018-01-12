@@ -23,8 +23,46 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
         print('init PYETHAPI_ATMCHAIN_REWARDS_PLAN ...')
         super(PYETHAPI_ATMCHAIN_REWARDS_PLAN, self).__init__(blockchain_service)
 
-    def ATM_airdrop(self):
-        print('s')
+    def deploy_twitter_rewards_contract(self,sender,chain_name): 
+        self._deploy_contract( 
+            sender, 
+            chain_name,
+            'twitter.sol', 'TwitterAccount',
+            )
+
+    def bind_account(self,sender,chain_name,contract_name, user_id, user_addr):
+        _proxy = self._get_chain_proxy(chain_name)
+        contract_proxy = _proxy.get_contract_proxy(
+            sender,
+            contract_name
+        )
+        block_number = _proxy.block_number()
+        txhash = contract_proxy.bind_account(user_id, user_addr)
+
+        _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_bind_account',user_id) 
+
+    def unbind_account(self,sender,chain_name,contract_name, user_id):
+        _proxy = self._get_chain_proxy(chain_name)
+        contract_proxy = _proxy.get_contract_proxy(
+            sender,
+            contract_name
+        )
+        block_number = _proxy.block_number()
+        txhash = contract_proxy.bind_account(user_id)
+
+        _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_unbind_account',user_id)
+
+    def ATM_rewards(self,sender,chain_name,contract_name,luckyboys_num):
+        _proxy = self._get_chain_proxy(chain_name)
+        contract_proxy = _proxy.get_contract_proxy(
+            sender,
+            contract_name
+        )
+        block_number = _proxy.block_number()
+        txhash = contract_proxy.lotus(luckyboys_num, retweet_id, users_list)
+
+        _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_lotus',retweet_id)
+        _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_lotus_result',retweet_id)    
 
 
 def print_basicinfo():
@@ -55,8 +93,8 @@ class TwitterMonitor(object):
     
     def __init__(self):
         #print_basicinfo()
-        self.scan_delay1 = 3
-        self.scan_delay2 = 5
+        self.scan_delay1 = 67
+        self.scan_delay2 = 37
         self.is_stopped = False
         
     def run_task(self):
@@ -71,12 +109,10 @@ class TwitterMonitor(object):
             gevent.sleep(self.scan_delay1)
             print('\n[ monitor followers]working start at {}'.format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
             try:
-                statuses = twitter_api.GetUserTimeline(screen_name=screen_name)
-                for s in statuses:
-                    print('[history messgae id=%s]: %s\n'%(s.id,s.text))
-                    print('retweet users: {}'.format(twitter_api.GetRetweeters(s.id)))
+                users = twitter_api.GetFollowers(screen_name=screen_name)
+                # print('[current followers]: %s'%u.name) for u in users
             except:
-                info=sys.exc_info()  
+                info=sys.exc_info()
                 print info[0],":",info[1]
                 pass
 
@@ -87,9 +123,11 @@ class TwitterMonitor(object):
             print('\n[ monitor retweet]working start at {}'.format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
             try:
                 statuses = twitter_api.GetUserTimeline(screen_name=screen_name)
+                """
                 for s in statuses:
                     print('[history messgae id=%s]: %s\n'%(s.id,s.text))
                     print('retweet users: {}'.format(twitter_api.GetRetweeters(s.id)))
+                """
             except:
                 info=sys.exc_info()  
                 print info[0],":",info[1]

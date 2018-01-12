@@ -21,7 +21,6 @@ class PYETHAPI(object):
     #raise NotImplementedError()
 
     def new_blockchain_proxy(self, chain_name,host,port):
-        assert chain_name in ['ethereum', 'quorum']
         if chain_name not in self.blockchain_service.blockchain_proxy.keys():
             ethereum_proxy = self.blockchain_service.new_blockchain_proxy(
                 chain_name, host, port, os.getcwd()+'/pyethapi/keystore')
