@@ -1,4 +1,4 @@
-pragma solidity ^0.4.19;
+pragma solidity ^0.4.15;
 
 contract Owned {
     /// @dev `owner` is the only address that can call a function with this
@@ -32,7 +32,7 @@ contract Owned {
 }
 
 
-contract account is  Owned {
+contract TwitterAccount is  Owned {
 
     event Log_lotus(bytes32 _id, bytes32[] users);
     event Log_bind_account(bytes32 _id, address _addr);
@@ -70,7 +70,7 @@ contract account is  Owned {
             //addmod(a,b,c) 取模算法: (a+b)%c
             uint temp = addmod(uint(block.blockhash(block.number-j)),j,total_users);
             luckyboys_addr[j] = users_addr[temp];
-            luckyboys[j] = valid_users_list[temp];
+            luckyboys[j] = valid_users_list[temp]; 
         }
         Log_lotus_result(retweet_id,luckyboys,luckyboys_addr);
     }

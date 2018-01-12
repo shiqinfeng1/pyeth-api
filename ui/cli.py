@@ -2,8 +2,8 @@ import click
 import os
 import gevent
 import gevent.monkey
-from gevent import Greenlet
 import signal
+from gevent import Greenlet
 from service import constant 
 from service.utils import (
     split_endpoint

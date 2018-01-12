@@ -91,7 +91,26 @@ class ATMChainTools(object):
         else:
             print('unkonw chain name: {}'.format(chain_name))
             return
-        
+
+class AppTools(object):
+    def __init__(self, chain):
+        self.chain = chain
+    
+    def deploy_twitter_rewards_contract(self,chain_name): 
+        _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
+        sender=_proxy.account_manager.admin_account
+        self.chain.pyeth_api.deploy_twitter_rewards_contract(sender,chain_name)
+
+    def bind_account(self,chain_name, user_id, user_addr):
+        _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
+        sender=_proxy.account_manager.admin_account
+        self.chain.pyeth_api.bind_account(sender,chain_name,'TwitterAccount',user_id, user_addr)
+
+    def unbind_account(self,chain_name, user_id): 
+        _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
+        sender=_proxy.account_manager.admin_account
+        self.chain.pyeth_api.unbind_account(sender,chain_name,'TwitterAccount',user_id)
+
 class Console(object):
 
     """A service starting an interactive ipython session when receiving the
@@ -109,10 +128,11 @@ class Console(object):
 
     def start(self):
         # start console service
+        ATMChain_tools=ATMChainTools(self.pyeth_api)
+        App_tools=AppTools(ATMChain_tools)
         self.console_locals  = dict(
-            chain=ATMChainTools(
-                self.pyeth_api
-            ),
+            chain=ATMChain_tools,
+            app_twitter=App_tools,
             ATMChainUsage=ATMChain_print_usage,
         )
 
