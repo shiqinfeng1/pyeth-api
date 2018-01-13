@@ -102,7 +102,7 @@ OPTIONS = [
         help=(
             'Start with specified business.'
         ),
-        default='atmchain',
+        default='atmchain_rewards_plan',
         type=str,
         show_default=True,
     ),

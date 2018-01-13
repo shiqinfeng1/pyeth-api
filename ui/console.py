@@ -104,12 +104,23 @@ class AppTools(object):
     def bind_account(self,chain_name, user_id, user_addr):
         _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
         sender=_proxy.account_manager.admin_account
-        self.chain.pyeth_api.bind_account(sender,chain_name,'TwitterAccount',user_id, user_addr)
+        self.chain.pyeth_api.bind_account(sender,chain_name,user_id, user_addr)
 
     def unbind_account(self,chain_name, user_id): 
         _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
         sender=_proxy.account_manager.admin_account
-        self.chain.pyeth_api.unbind_account(sender,chain_name,'TwitterAccount',user_id)
+        self.chain.pyeth_api.unbind_account(sender,chain_name,user_id)
+    
+    def twitter_status_list(self): 
+        self.chain.pyeth_api.twitter_status_list()
+
+    def retwitter_list(self,status_id): 
+        self.chain.pyeth_api.retwitter_list(status_id)
+    
+    def get_luckyboys(self,chain_name,status_id,luckyboys_num):
+        _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
+        sender=_proxy.account_manager.admin_account
+        self.chain.pyeth_api.get_luckyboys(sender,chain_name,status_id,luckyboys_num)
 
 class Console(object):
 

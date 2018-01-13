@@ -30,40 +30,70 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
             'twitter.sol', 'TwitterAccount',
             )
 
-    def bind_account(self,sender,chain_name,contract_name, user_id, user_addr):
+    def bind_account(self,sender,chain_name, user_id, user_addr):
         _proxy = self._get_chain_proxy(chain_name)
         contract_proxy = _proxy.get_contract_proxy(
             sender,
-            contract_name
+            'TwitterAccount'
         )
         block_number = _proxy.block_number()
         txhash = contract_proxy.bind_account(user_id, user_addr)
 
         _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_bind_account',user_id) 
 
-    def unbind_account(self,sender,chain_name,contract_name, user_id):
+    def unbind_account(self,sender,chain_name, user_id):
         _proxy = self._get_chain_proxy(chain_name)
         contract_proxy = _proxy.get_contract_proxy(
             sender,
-            contract_name
+            'TwitterAccount'
         )
         block_number = _proxy.block_number()
         txhash = contract_proxy.bind_account(user_id)
 
         _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_unbind_account',user_id)
 
-    def ATM_rewards(self,sender,chain_name,contract_name,luckyboys_num):
+    def twitter_status_list(self):
+        statuses = get_status_list('ATMChainDev')
+        for s in statuses:
+            print('[ history status id= %s ]: %s...\n'%(s.id,s.text[:40]))
+    
+    def retwitter_list(self,status_id):
+        retweeters = get_retweeters(status_id)
+        if retweeters == None:
+            print('get_retweeters fail.')
+            return 
+        for s in retweeters:
+            print('retweeters id = %s'%(s))
+
+    def get_luckyboys(self,sender,chain_name,status_id,luckyboys_num):
+        users_list=list()
+        if isinstance(status_id, (int, long)):
+            status_id = str(status_id)
+            
+        followers = get_followers('ATMChainDev')
+        retweeters = get_retweeters(status_id)
+        for retweeter in retweeters:
+            if retweeter in followers:
+                users_list.append(str(retweeter))
+
+        
+        print('status_id: {} validate users list= {}'.format(status_id,users_list))
+
         _proxy = self._get_chain_proxy(chain_name)
         contract_proxy = _proxy.get_contract_proxy(
             sender,
-            contract_name
+            'TwitterAccount'
         )
         block_number = _proxy.block_number()
-        txhash = contract_proxy.lotus(luckyboys_num, retweet_id, users_list)
+        txhash = contract_proxy.lotus(luckyboys_num, status_id, users_list)
 
-        _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_lotus',retweet_id)
-        _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_lotus_result',retweet_id)    
-
+        _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_lotus',status_id)
+        event_key, event = _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_lotus_result',status_id)    
+        r1 = event[0]['luckyboys']
+        r2 = event[0]['luckyboys_addr']
+        print('\n================= luckyboys list  =================== ')
+        for (i1, i2) in zip(r1,r2):
+            print('luckyboys: {:20} address = {} '.format(i1[:i1.find('\x00')],i2))
 
 def print_basicinfo():
     print('================= start running twitter monitor  =================== ')
@@ -81,13 +111,49 @@ def print_basicinfo():
     print('\n================= user {} status       ================================ '.format(screen_name))
     statuses = twitter_api.GetUserTimeline(screen_name=screen_name)
     for s in statuses:
-        print('[history messgae id=%s]: %s\n'%(s.id,s.text))
+        print('[ history status id= %s ]: %s\n'%(s.id,s.text))
         print('retweet users: {}'.format(twitter_api.GetRetweeters(s.id)))
 
     print('\n================= user followers      ================================ ')
     users = twitter_api.GetFollowers(screen_name=screen_name)
     for u in users:
         print('[current followers]: %s'%u.name)
+
+def get_followers(screenname):
+    users=None
+    try:
+        users = twitter_api.GetFollowers(screen_name=screenname)
+        for u in users:
+            print('[current followers] id = %-20s name = %s'%(u.id,u.name))
+    except:
+        info=sys.exc_info()
+        print info[0],":",info[1]
+        pass
+    
+    if users != None:
+        return [u.id for u in users]
+    else: 
+        return None
+
+def get_status_list(screenname):
+    statuses=None
+    try:
+        statuses = twitter_api.GetUserTimeline(screen_name=screenname)
+    except:
+        info=sys.exc_info()
+        print info[0],":",info[1]
+        pass
+    return  statuses
+
+def get_retweeters(status_id):
+    retweeters=None
+    try:
+        retweeters = twitter_api.GetRetweeters(status_id)
+    except:
+        info=sys.exc_info()  
+        print info[0],":",info[1]
+        pass
+    return retweeters
 
 class TwitterMonitor(object):
     
@@ -108,30 +174,19 @@ class TwitterMonitor(object):
         while not self.is_stopped:
             gevent.sleep(self.scan_delay1)
             print('\n[ monitor followers]working start at {}'.format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-            try:
-                users = twitter_api.GetFollowers(screen_name=screen_name)
-                # print('[current followers]: %s'%u.name) for u in users
-            except:
-                info=sys.exc_info()
-                print info[0],":",info[1]
-                pass
+            get_followers('ATMChainDev')
 
     def run_monitor_retweet(self):
         print('satrt monitor retweet...')
         while not self.is_stopped:
             gevent.sleep(self.scan_delay2)
             print('\n[ monitor retweet]working start at {}'.format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-            try:
-                statuses = twitter_api.GetUserTimeline(screen_name=screen_name)
-                """
-                for s in statuses:
-                    print('[history messgae id=%s]: %s\n'%(s.id,s.text))
-                    print('retweet users: {}'.format(twitter_api.GetRetweeters(s.id)))
-                """
-            except:
-                info=sys.exc_info()  
-                print info[0],":",info[1]
-                pass
+            
+            statuses = get_status_list('ATMChainDev')
+            for s in statuses:
+                print('[history status id= %s ]: %s\n'%(s.id,s.text))
+                get_retweeters(s.id)
+
 
 if __name__ == '__main__':
     twitter_monitor = TwitterMonitor()
@@ -141,9 +196,11 @@ if __name__ == '__main__':
     gevent.signal(signal.SIGTERM, event.set)
     gevent.signal(signal.SIGINT, event.set)
     event.wait()
+""" do not start a thread for twitter warning: 'Rate limit exceeded'
 else:
     twitter_monitor = TwitterMonitor()
     t = threading.Thread(target=twitter_monitor.run_task)
     t.setDaemon(True)
     t.start()
+"""
 
