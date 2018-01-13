@@ -70,7 +70,7 @@ class ContractProxy(object):
                 fromBlock
                 )
             log.info('Polled event(without filter.unknow event_key={}): {}'.format(event_key,event))
-
+        return event_key,event
 class MethodProxy(object):
     """ A callable interface that exposes a contract function. """
     valid_kargs = set(('gasprice', 'startgas', 'value'))

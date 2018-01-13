@@ -258,6 +258,8 @@ class BlockChainProxy(object):
         contract_proxy=None,
         event_name=None,*event_filter_args):
 
+        event_key=None
+        event=None
         self.jsonrpc_client.poll(
             unhexlify(transaction_hash),
             timeout=constant.DEFAULT_POLL_TIMEOUT,
@@ -266,14 +268,15 @@ class BlockChainProxy(object):
         fail = self.check_transaction_threw(transaction_hash)
         if fail:
             log.info('transaction({}) execute failed .'.format(transaction_hash))
-            return False
+            return event_key, event
 
         if event_name != None and contract_proxy != None:
-            contract_proxy.poll_contract_event(
+            event_key,event = contract_proxy.poll_contract_event(
                 fromBlock,
                 contract_proxy.contract_name,
                 event_name,
                 *event_filter_args)
+        return event_key, event    
         
     def deploy_contract(self, 
         sender, contract_file, contract_name,

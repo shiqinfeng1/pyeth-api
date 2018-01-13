@@ -57,11 +57,59 @@ def TokenExchange_LogSettleToken_filter_condition(_user):
 
     return filter
 
+def TwitterAccount_Log_lotus_filter_condition(_id):
+    
+    def filter(event):
+        if event['_event_type'] != 'Log_lotus':
+            return False
+        if event['_id'][:len(_id)] == _id:
+            return True
+        return False
+
+    return filter
+
+def TwitterAccount_Log_lotus_result_filter_condition(_id):
+    
+    def filter(event):
+        if event['_event_type'] != 'Log_lotus_result':
+            return False
+        if event['_id'][:len(_id)] == _id:
+            return True
+        return False
+
+    return filter
+
+def TwitterAccount_Log_unbind_account_filter_condition(_id):
+    
+    def filter(event):
+        if event['_event_type'] != 'Log_unbind_account':
+            return False
+        if event['_id'][:len(_id)] == _id:
+            return True
+        return False
+
+    return filter
+
+def TwitterAccount_Log_bind_account_filter_condition(_id):
+    
+    def filter(event):
+        if event['_event_type'] != 'Log_bind_account':
+            return False
+        if event['_id'][:len(_id)] == _id:
+            return True
+        return False
+
+    return filter
+
 __conditionSet__ = {
     'ERC223Token_Minted': ERC223Token_Minted_filter_condition,
     'ERC223Token_Transfer': ERC223Token_Transfer_filter_condition,
     'TokenExchange_LogLockToken':TokenExchange_LogLockToken_filter_condition,
     'TokenExchange_LogSettleToken':TokenExchange_LogSettleToken_filter_condition,
+    'TwitterAccount_Log_bind_account': TwitterAccount_Log_bind_account_filter_condition,
+    'TwitterAccount_Log_unbind_account': TwitterAccount_Log_unbind_account_filter_condition,
+    'TwitterAccount_Log_lotus_result': TwitterAccount_Log_lotus_result_filter_condition,
+    'TwitterAccount_Log_lotus': TwitterAccount_Log_lotus_filter_condition,
 }
 
 
