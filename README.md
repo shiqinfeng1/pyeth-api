@@ -23,7 +23,28 @@ pyeth-api runs on Python 2.7, for Pyethapp is only support for Python 2.7.
 ## usage
 1. drop your contract to smart_contracts folder
 1. in the custom/custom_contract_events.py, add your contract event filter condition which needs to be listened 
-1. to be continue...
+1. in the custom/custom_contract_events.py,register your filter function to `__conditionSet__`
+1. write operate api. 
+ example:
+ ```
+ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
+    def __init__(self,blockchain_service):
+        print('init PYETHAPI_ATMCHAIN_REWARDS_PLAN ...')
+        super(PYETHAPI_ATMCHAIN_REWARDS_PLAN, self).__init__(blockchain_service)
+
+    def deploy_twitter_rewards_contract(self,deployer=None): 
+        ethereum_proxy = self._get_chain_proxy('ethereum')
+        if deployer == None:
+            ethereum_sender = ethereum_proxy.account_manager.admin_account
+        else:
+            ethereum_sender = deployer
+
+        self._deploy_contract( 
+            ethereum_sender, 
+            'ethereum',
+            'twitter.sol', 'TwitterAccount',
+            )
+ ```
 
   start command:
   ```
@@ -41,7 +62,9 @@ pyeth-api runs on Python 2.7, for Pyethapp is only support for Python 2.7.
                         20000000000]
   --keystore-path PATH  If you have a non-standard path for the ethereum
                         keystore directory provide it using this argument.
-  --help                Show this message and exit.
+  --inst                to start with an app inst. example: atmchain
+  --help                Show this message and exit.
+ 
   ```
 
 ## thanks
