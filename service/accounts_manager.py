@@ -2,14 +2,23 @@
 import getpass
 import sys
 import os
+import random
 from ethereum import slogging
 from ethereum import keys
 from bitcoin import privtopub
 import json
 from binascii import hexlify, unhexlify
 from service import constant 
+from uuid import UUID
+from rlp.utils import decode_hex
+from ethereum.utils import sha3, is_string, encode_hex, remove_0x_head, to_string
 
 log = slogging.getLogger(__name__)
+
+def mk_random_privkey():
+    k = hex(random.getrandbits(256))[2:-1].zfill(64)
+    assert len(k) == 64
+    return decode_hex(k)
 
 def find_datadir():
     home = os.path.expanduser('~')
@@ -70,6 +79,31 @@ class Account(object):
 
         if password is not None:
             self.unlock(password)
+
+    @classmethod
+    def new(cls, password, key=None, uuid=None, path=None):
+        """Create a new account.
+
+        Note that this creates the account in memory and does not store it on disk.
+
+        :param password: the password used to encrypt the private key
+        :param key: the private key, or `None` to generate a random one
+        :param uuid: an optional id
+        """
+        if key is None:
+            key = mk_random_privkey()
+
+        # [NOTE]: key and password should be bytes
+        if not is_string(key):
+            key = to_string(key)
+        if not is_string(password):
+            password = to_string(password)
+
+        keystore = keys.make_keystore_json(key, password)
+        if not is_string(uuid):
+            uuid = to_string(uuid)
+        keystore['id'] = uuid
+        return Account(keystore, password, path)
 
     @classmethod
     def load(cls, path, password=None):
@@ -247,7 +281,47 @@ class AccountManager(object):
             address = address[2:]
 
         return address.lower() in self.accounts
+    
+    def add_account(self, account, store=True, include_address=True, include_id=True):
+        """Add an account.
 
+        If `store` is true the account will be stored as a key file at the location given by
+        `account.path`. If this is `None` a :exc:`ValueError` is raised. `include_address` and
+        `include_id` determine if address and id should be removed for storage or not.
+
+        This method will raise a :exc:`ValueError` if the new account has the same UUID as an
+        account already known to the service. Note that address collisions do not result in an
+        exception as those may slip through anyway for locked accounts with hidden addresses.
+        """
+        log.info('adding account', account=account)
+        if account.uuid is not None:
+            for address in self.accounts.keys():
+                with open(self.accounts[address]) as data_file:
+                    data = json.load(data_file)
+                    if len([acct for acct in self.accounts if data['id'] == account.uuid]) > 0:
+                        log.error('could not add account (UUID collision)', uuid=account.uuid)
+                        raise ValueError('Could not add account (UUID collision)')
+        if store:
+            if account.path is None:
+                raise ValueError('Cannot store account without path')
+            assert os.path.isabs(account.path), account.path
+            if os.path.exists(account.path):
+                log.error('File does already exist', path=account.path)
+                raise IOError('File does already exist')
+            assert account.path not in [path for path in self.accounts]
+            try:
+                directory = os.path.dirname(account.path)
+                if not os.path.exists(directory):
+                    os.makedirs(directory)
+                with open(account.path, 'w') as f:
+                    f.write(account.dump(include_address, include_id))
+            except IOError as e:
+                log.error('Could not write to file', path=account.path, message=e.strerror,
+                          errno=e.errno)
+                raise
+        self.accounts[encode_hex(account._address)] = account.path
+        print('after add new account: {} path:{}'.format(self.accounts.keys(),account.path))
+        
     def get_account(self, address, password=None, password_file=None):
         """Find the keystore file for an account, unlock it and get the private key
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
-
+import click
 import cStringIO
 import json
 import sys
@@ -18,9 +18,9 @@ from ethereum.utils import denoms
 from pyethapp.utils import bcolors as bc
 from pyethapp.jsonrpc import default_gasprice
 from pyethapp.console_service import GeventInputHook, SigINTHandler
-
 from api.python import PYETHAPI
-from service.utils import  get_contract_path, safe_address_decode
+from service.utils import  get_contract_path, safe_address_decode,privatekey_to_address
+from binascii import hexlify, unhexlify
 
 # ipython needs to accept "--gui gevent" option
 IPython.core.shellapp.InteractiveShellApp.gui.values += ('gevent',)
@@ -41,25 +41,51 @@ class ATMChainTools(object):
         
     def _print_proxy_info(self,proxy):
         print("=======================================")
-        print("'chain_name':      {}".format(proxy.chain_name))
-        print("'host':            {}".format(proxy.host))
-        print("'port':            {}".format(proxy.port))
-        print("'keystore_path':   {}".format(proxy.account_manager.keystore_path))
-        print("'default accounts':{}".format(list(proxy.account_manager.accounts.keys())))
+        print("{:20}: {}".format('chain_name',proxy.chain_name))
+        if proxy.endpoint !=None:
+            print("{:20}: {}".format('endpoint',proxy.endpoint))
+        else:
+            print("{:20}: {}".format('host',proxy.host))
+            print("{:20}: {}".format('port',proxy.port))
+        print("{:20}: {}".format('keystore_path',proxy.account_manager.keystore_path))
+        print("{:20}: {}".format('default accounts',list(proxy.account_manager.accounts.keys())))
 
-    def new_blockchain_proxy(self, chain_name,host,port):
-        proxy = self.pyeth_api.new_blockchain_proxy(chain_name,host,port)
+    def new_blockchain_proxy(self, chain_name,host,port,infura_endpoint=None):
+        proxy = self.pyeth_api.new_blockchain_proxy(chain_name,host,port,infura_endpoint)
         self._print_proxy_info(proxy)
 
     def blockchain_proxy_list(self):
         for (k,v) in self.pyeth_api.blockchain_proxy_list():
             self._print_proxy_info(v)
 
+    def query_eth_balance(self,chain_name,account):
+        result = self.pyeth_api.query_eth_balance(chain_name,account)
+        print('------------------------------------')
+        print('{:<30}: {:,}'.format(account, result))
+
     def deploy_ATM_contract(self,atm_address=None):
         self.pyeth_api.deploy_ATM_contract(atm_address)
 
-    def accounts_list(self): 
-        a0,a1,a2 = self.pyeth_api.accounts_list()
+    def new_account(self,chain_name, key=None):
+        password = click.prompt('Password to encrypt private key', default='', hide_input=True,
+                                confirmation_prompt=False, show_default=False)
+        self.pyeth_api.new_account(chain_name, password, key)
+
+    def check_account(self,privkey):
+        if isinstance(privkey,str):
+            privkey = unhexlify(privkey)
+        address = privatekey_to_address(privkey)
+        print('{}: {}'.format(hexlify(privkey),hexlify(address)))
+
+    def eth_accounts_list(self,chain_name):
+        acc = self.pyeth_api.eth_accounts_list(chain_name)
+        print('------------------------------------\n[ethereum user accounts]:')
+        for k, v in enumerate(acc):
+            print('{}: {}'.format(k,'0x'+v))
+        print('------------------------------------')
+
+    def ATM_accounts_list(self): 
+        a0,a1,a2 = self.pyeth_api.ATM_accounts_list()
         print('------------------------------------\n[contract addresses]:')
         for k, v in a0.iteritems():
             print('{}: {}'.format(k,v))
@@ -71,8 +97,8 @@ class ATMChainTools(object):
         for k, v in enumerate(a2):
             print('{}: {}'.format(k,'0x'+v))
 
-    def query_balance(self,account):
-        result = self.pyeth_api.query_balance('ethereum','quorum',account)
+    def query_atmchain_balance(self,account):
+        result = self.pyeth_api.query_atmchain_balance('ethereum','quorum',account)
         print('------------------------------------')
         for key in sorted(result.keys()):
             print('{:<30}: {:,}'.format(key, result[key]))
@@ -95,21 +121,35 @@ class ATMChainTools(object):
 class AppTools(object):
     def __init__(self, chain):
         self.chain = chain
-    
+        self.current_sender = None
+
+    def switch_sender(self,address): 
+        assert isinstance(address,str) 
+        """
+        if address[:2] == '0x':
+            address = address[2:]
+        assert len(address) == 40
+        """
+        self.current_sender = address
+        print('current_sender: {}'.format(self.current_sender))
+
     def deploy_twitter_rewards_contract(self,chain_name): 
         _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
-        sender=_proxy.account_manager.admin_account
-        self.chain.pyeth_api.deploy_twitter_rewards_contract(sender,chain_name)
+        if self.current_sender == None:
+            self.current_sender = _proxy.account_manager.admin_account 
+        self.chain.pyeth_api.deploy_twitter_rewards_contract(self.current_sender,chain_name)
 
     def bind_account(self,chain_name, user_id, user_addr):
         _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
-        sender=_proxy.account_manager.admin_account
-        self.chain.pyeth_api.bind_account(sender,chain_name,user_id, user_addr)
+        if self.current_sender == None:
+            self.current_sender = _proxy.account_manager.admin_account 
+        self.chain.pyeth_api.bind_account(self.current_sender,chain_name,user_id, user_addr)
 
     def unbind_account(self,chain_name, user_id): 
         _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
-        sender=_proxy.account_manager.admin_account
-        self.chain.pyeth_api.unbind_account(sender,chain_name,user_id)
+        if self.current_sender == None:
+            self.current_sender = _proxy.account_manager.admin_account
+        self.chain.pyeth_api.unbind_account(self.current_sender,chain_name,user_id)
     
     def twitter_status_list(self): 
         self.chain.pyeth_api.twitter_status_list()
@@ -119,8 +159,9 @@ class AppTools(object):
     
     def get_luckyboys(self,chain_name,status_id,luckyboys_num):
         _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
-        sender=_proxy.account_manager.admin_account
-        self.chain.pyeth_api.get_luckyboys(sender,chain_name,status_id,luckyboys_num)
+        if self.current_sender == None:
+            self.current_sender = _proxy.account_manager.admin_account
+        self.chain.pyeth_api.get_luckyboys(self.current_sender,chain_name,status_id,luckyboys_num)
 
 class Console(object):
 

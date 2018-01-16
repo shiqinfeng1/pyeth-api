@@ -14,6 +14,8 @@ from ethereum.utils import encode_hex, normalize_address
 from pyethapp.jsonrpc import (
     data_encoder,
 )
+from rlp.utils import decode_hex
+import json
 import getpass
 from exceptions import (
     EthNodeCommunicationError,
@@ -62,7 +64,6 @@ log = slogging.getLogger(__name__)  # pylint: disable=invalid-name
 #   - poll for the transaction hash
 #   - check if the proper events were emited
 #   - use `call` and `transact` to interact with pyethapp.rpc_client proxies
-
 
 class JSONRPCPollTimeoutException(Exception):
     # FIXME import this from pyethapp.rpc_client once it is implemented
@@ -132,18 +133,21 @@ class BlockChainService(object):
             chain_name,
             host,
             port,
-            keystore_path):
+            keystore_path,
+            infura_endpoint=None):
         
         self.blockchain_proxy[chain_name] = BlockChainProxy(
             chain_name,
             host,
             port,
-            keystore_path)
+            keystore_path,
+            infura_endpoint)
         if self.blockchain_proxy[chain_name] == None:
             raise RuntimeError('create BlockChainProxy fail.')
-        
-        if not check_json_rpc(self.blockchain_proxy[chain_name].jsonrpc_client):
-            raise RuntimeError('BlockChainProxy connect eth-client fail.')
+            
+        if infura_endpoint == None:
+            if not check_json_rpc(self.blockchain_proxy[chain_name].jsonrpc_client):
+                raise RuntimeError('BlockChainProxy connect eth-client fail.')
 
         return self.blockchain_proxy[chain_name]
 
@@ -161,7 +165,8 @@ class BlockChainProxy(object):
             chain_name,
             host,
             port,
-            keystore_path):
+            keystore_path,
+            endpoint=None):
             
         self.chain_name = chain_name
         self.host = host
@@ -169,21 +174,36 @@ class BlockChainProxy(object):
         self.contract_owner_proxy =  dict()
         self.jsonrpc_proxy =  dict()
         self.account_manager = accounts_manager.AccountManager(keystore_path)
-
-        self.jsonrpc_client = JSONRPCClient(
-            host,
-            port,
-            '',
-        )
+        self.endpoint = endpoint
+        if endpoint == None:
+            self.jsonrpc_client = JSONRPCClient(
+                host,
+                port,
+                '',
+            )
+        else:
+            self.jsonrpc_client = JSONRPCClient_for_infura(
+                endpoint,
+                '',
+            )
 
     def get_jsonrpc_client(self, sender, password=None):
         if self.jsonrpc_proxy.get(sender) == None:
             private_key = self.account_manager.get_account(sender,password).privkey
-            self.jsonrpc_proxy[sender] = JSONRPCClient(
-                host = self.host,
-                port = self.port,
-                privkey = private_key,
-            )
+            if len(hexlify(private_key)) != 64:
+                private_key = decode_hex(private_key)
+            print('temp : private_key={} type:{} len={}'.format(hexlify(private_key),type(private_key),len(private_key)))
+            if self.endpoint == None:
+                self.jsonrpc_proxy[sender] = JSONRPCClient(
+                    host = self.host,
+                    port = self.port,
+                    privkey = private_key,
+                )
+            else:
+                self.jsonrpc_proxy[sender] = JSONRPCClient_for_infura(
+                    self.endpoint,
+                    privkey = private_key,
+                )
         return self.jsonrpc_proxy[sender]
 
     """获取本合约管理服务维护的和合约代理"""
@@ -366,7 +386,7 @@ class BlockChainProxy(object):
 
     def balance(self, account):
         """ Return the balance of the account of given address. """
-        res = self.jsonrpc_client.call('eth_getBalance', address_encoder(account), 'pending')
+        res = self.jsonrpc_client.call('eth_getBalance', address_encoder(account), 'latest')
         return quantity_decoder(res)
 
 class JSONRPCClient(object):
@@ -753,6 +773,7 @@ class JSONRPCClient(object):
             sender = sender or privkey_address
 
             if sender != privkey_address:
+                print('sender {} != privkey_address {}'.format(hexlify(sender),hexlify(privkey_address)))
                 raise ValueError('sender for a different privkey .')
 
             if nonce is None:
@@ -1093,3 +1114,43 @@ class JSONRPCClient(object):
         finally:
             if deadline:
                 deadline.cancel()
+
+class JSONRPCClient_for_infura(JSONRPCClient):
+    def __init__(self, endpoint, privkey, nonce_update_interval=5.0, nonce_offset=0):
+        
+        session = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_maxsize=50)
+        session.mount(endpoint, adapter)
+
+        self.endpoint = endpoint
+        self.transport = None
+        self.protocol = None
+
+        self.privkey = privkey
+        
+        if privkey != '':
+            self.sender = privatekey_to_address(privkey)
+        else:
+            self.sender = ''
+        self.nonce_last_update = 0
+        self.nonce_current_value = None
+        self.nonce_lock = Semaphore()
+        self.nonce_update_interval = nonce_update_interval
+        self.nonce_offset = nonce_offset
+
+    @check_node_connection
+    def call(self, method, *args):
+        
+        payload = {
+            "jsonrpc": "2.0",
+            "id": 29846618,
+            "method": method,
+        }
+        if isinstance(args, tuple):
+            payload['params'] = args
+        else:
+            payload['params'] = [args,]
+        resp = requests.post(self.endpoint, data=json.dumps(payload))
+        result = json.loads(resp.text)
+        print("POST url:{} data:{} resp:{} datatype:{}".format(resp.url, json.dumps(payload),result,type(args)))
+        return result['result']

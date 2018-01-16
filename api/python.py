@@ -5,8 +5,10 @@ from service.utils import (
     address_encoder,
     address_decoder,
 )
-
-from service import constant
+from uuid import uuid4
+from service import constant,accounts_manager
+from service.accounts_manager import Account,find_keystoredir
+from ethereum.utils import encode_hex
 
 class PYETHAPI(object):
     """ CLI interface. """
@@ -20,10 +22,13 @@ class PYETHAPI(object):
         return self.blockchain_service.adminAddress
     #raise NotImplementedError()
 
-    def new_blockchain_proxy(self, chain_name,host,port):
+    def new_blockchain_proxy(self, chain_name,host,port,infura_endpoint=None):
         if chain_name not in self.blockchain_service.blockchain_proxy.keys():
+            if infura_endpoint !=None:
+                assert infura_endpoint in ['mainnet', 'ropsten', 'kovan', 'rinkeby']
+                infura_endpoint = 'https://'+infura_endpoint+'.infura.io/SaTkK9e9TKrRuhHg'
             ethereum_proxy = self.blockchain_service.new_blockchain_proxy(
-                chain_name, host, port, os.getcwd()+'/pyethapi/keystore')
+                chain_name, host, port, os.getcwd()+'/pyethapi/keystore',infura_endpoint)
         return ethereum_proxy
 
     def blockchain_proxy_list(self):
@@ -34,6 +39,29 @@ class PYETHAPI(object):
         assert chain_name in self.blockchain_service.blockchain_proxy.keys()
         _proxy = self.blockchain_service.blockchain_proxy[chain_name]
         return _proxy
+
+    def new_account(self, chain_name, password=None, key=None):
+        
+        id_ = uuid4()
+        _proxy = self._get_chain_proxy(chain_name)
+
+        """
+        if password is None:
+            password = click.prompt('Password to encrypt private key', default='', hide_input=True,
+                                    confirmation_prompt=True, show_default=False)
+        """
+        account = Account.new(password, key=key, uuid=id_)
+        account.path = os.path.join(os.getcwd()+'/pyethapi/keystore', '0x'+encode_hex(account.address))
+        try:
+            _proxy.account_manager.add_account(account)
+        except IOError:
+            print('Could not write keystore file. Make sure you have write permission in the '
+                    'configured directory and check the log for further information.')
+            sys.exit(1)
+        else:
+            print('Account creation successful')
+            print('  Address: {}'.format(encode_hex(account.address)))
+            print('       Id: {}'.format(account.uuid))
 
     def eth_accounts_list(self,chain_name): 
         _proxy = self._get_chain_proxy(chain_name)
@@ -84,7 +112,7 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
         print('init PYETHAPI_ATMCHAIN ...')
         super(PYETHAPI_ATMCHAIN, self).__init__(blockchain_service)
         
-    def accounts_list(self): 
+    def ATM_accounts_list(self): 
         contract_Addresses=dict()
         ethereum_proxy = self._get_chain_proxy('ethereum')
         quorum_proxy = self._get_chain_proxy('quorum')
@@ -231,8 +259,15 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
         block_number = ethereum_proxy.block_number()
         txhash = TokenExchange_ethereum_owner.settleToken(scaner,settle_amount*constant.ATM_DECIMALS)
         ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,TokenExchange_ethereum_owner,'LogSettleToken',scaner)
+    
+    def query_eth_balance(self,chain_name,account):
+        _proxy = self._get_chain_proxy(chain_name)
 
-    def query_balance(self,src_chain,dest_chain,account):
+        temp = _proxy.balance(address_decoder(account))
+        result = float(temp)/constant.WEI_TO_ETH
+        return result
+
+    def query_atmchain_balance(self,src_chain,dest_chain,account):
 
         result=dict()
         ethereum_proxy = self._get_chain_proxy(src_chain)
