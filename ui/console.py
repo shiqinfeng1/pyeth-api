@@ -67,13 +67,15 @@ class ATMChainTools(object):
         self.pyeth_api.deploy_ATM_contract(atm_address)
 
     def new_account(self,chain_name, key=None):
+        assert isinstance(key,str) and len(key)==64
+
         password = click.prompt('Password to encrypt private key', default='', hide_input=True,
                                 confirmation_prompt=False, show_default=False)
         self.pyeth_api.new_account(chain_name, password, key)
 
     def check_account(self,privkey):
-        if isinstance(privkey,str):
-            privkey = unhexlify(privkey)
+        assert isinstance(privkey,str)
+        privkey = unhexlify(privkey)
         address = privatekey_to_address(privkey)
         print('{}: {}'.format(hexlify(privkey),hexlify(address)))
 

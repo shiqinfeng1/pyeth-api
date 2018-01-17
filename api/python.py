@@ -41,15 +41,12 @@ class PYETHAPI(object):
         return _proxy
 
     def new_account(self, chain_name, password=None, key=None):
-        
+        assert isinstance(key,str) and len(key)==64
         id_ = uuid4()
         _proxy = self._get_chain_proxy(chain_name)
 
-        """
         if password is None:
-            password = click.prompt('Password to encrypt private key', default='', hide_input=True,
-                                    confirmation_prompt=True, show_default=False)
-        """
+            password = ''
         account = Account.new(password, key=key, uuid=id_)
         account.path = os.path.join(os.getcwd()+'/pyethapi/keystore', '0x'+encode_hex(account.address))
         try:

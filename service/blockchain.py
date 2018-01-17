@@ -190,8 +190,10 @@ class BlockChainProxy(object):
     def get_jsonrpc_client(self, sender, password=None):
         if self.jsonrpc_proxy.get(sender) == None:
             private_key = self.account_manager.get_account(sender,password).privkey
+
             if len(hexlify(private_key)) != 64:
                 private_key = decode_hex(private_key)
+
             print('temp : private_key={} type:{} len={}'.format(hexlify(private_key),type(private_key),len(private_key)))
             if self.endpoint == None:
                 self.jsonrpc_proxy[sender] = JSONRPCClient(
@@ -1130,6 +1132,7 @@ class JSONRPCClient_for_infura(JSONRPCClient):
         
         if privkey != '':
             self.sender = privatekey_to_address(privkey)
+            print('temp: sender={}'.format(hexlify(self.sender)))
         else:
             self.sender = ''
         self.nonce_last_update = 0
