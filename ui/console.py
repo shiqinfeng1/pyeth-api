@@ -55,7 +55,8 @@ class ATMChainTools(object):
         self._print_proxy_info(proxy)
 
     def blockchain_proxy_list(self):
-        for (k,v) in self.pyeth_api.blockchain_proxy_list():
+        for k in self.pyeth_api.blockchain_proxy_list():
+            v=self.pyeth_api._get_chain_proxy(k)
             self._print_proxy_info(v)
 
     def query_eth_balance(self,chain_name,account):
