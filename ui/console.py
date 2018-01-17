@@ -142,17 +142,17 @@ class AppTools(object):
             self.current_sender = _proxy.account_manager.admin_account 
         self.chain.pyeth_api.deploy_twitter_rewards_contract(self.current_sender,chain_name)
 
-    def bind_account(self,chain_name, user_id, user_addr):
+    def bind_account(self,chain_name, user_id, user_addr,contract_address=None):
         _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
         if self.current_sender == None:
             self.current_sender = _proxy.account_manager.admin_account 
-        self.chain.pyeth_api.bind_account(self.current_sender,chain_name,user_id, user_addr)
+        self.chain.pyeth_api.bind_account(self.current_sender,chain_name,user_id, user_addr,contract_address)
 
-    def unbind_account(self,chain_name, user_id): 
+    def unbind_account(self,chain_name, user_id,contract_address=None): 
         _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
         if self.current_sender == None:
             self.current_sender = _proxy.account_manager.admin_account
-        self.chain.pyeth_api.unbind_account(self.current_sender,chain_name,user_id)
+        self.chain.pyeth_api.unbind_account(self.current_sender,chain_name,user_id,contract_address)
     
     def twitter_status_list(self): 
         self.chain.pyeth_api.twitter_status_list()
@@ -160,11 +160,11 @@ class AppTools(object):
     def retwitter_list(self,status_id): 
         self.chain.pyeth_api.retwitter_list(status_id)
     
-    def get_luckyboys(self,chain_name,status_id,luckyboys_num):
+    def get_luckyboys(self,chain_name,status_id,luckyboys_num,contract_address=None):
         _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
         if self.current_sender == None:
             self.current_sender = _proxy.account_manager.admin_account
-        self.chain.pyeth_api.get_luckyboys(self.current_sender,chain_name,status_id,luckyboys_num)
+        self.chain.pyeth_api.get_luckyboys(self.current_sender,chain_name,status_id,luckyboys_num,contract_address)
 
 class Console(object):
 

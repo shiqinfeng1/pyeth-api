@@ -686,11 +686,10 @@ class JSONRPCClient(object):
             'blockNumber': quantity_decoder,
             'logIndex': quantity_decoder,
             'transactionIndex': quantity_decoder,
-            'removed': bool_decoder
         }
 
         return [
-            {k: decoders[k](v) for k, v in c.items() if v is not None}
+            {k: decoders[k](v) for k, v in c.items() if v is not None and k in decoders.keys()}
             for c in changes
         ]
 
@@ -785,7 +784,7 @@ class JSONRPCClient(object):
                 nonce = 0
 
         if not startgas:
-            startgas = self.gaslimit() - 1
+            startgas = self.gaslimit() / 3
 
         tx = Transaction(nonce, gasprice, startgas, to=to, value=value, data=data)
 
@@ -1080,11 +1079,11 @@ class JSONRPCClient(object):
                 # Could return None for a short period of time, until the
                 # transaction is added to the pool
                 transaction = self.call('eth_getTransactionByHash', transaction_hash)
-
+                """
                 # if the transaction was added to the pool and then removed
                 if transaction is None and last_result is not None:
                     raise Exception('invalid transaction, check gas price')
-
+                """
                 # the transaction was added to the pool and mined
                 if transaction and transaction['blockNumber'] is not None:
                     break
@@ -1155,5 +1154,9 @@ class JSONRPCClient_for_infura(JSONRPCClient):
             payload['params'] = [args,]
         resp = requests.post(self.endpoint, data=json.dumps(payload))
         result = json.loads(resp.text)
-        print("POST url:{} data:{} resp:{} datatype:{}".format(resp.url, json.dumps(payload),result,type(args)))
-        return result['result']
+        if 'result' in result.keys():
+            print("POST \nmethod:{} \nresult:{} ".format(payload['method'],result['result']))
+            return result['result']
+        else:
+            print("POST \nmethod:{} \nerror:{} ".format(payload['method'],result['error']))
+            return None
