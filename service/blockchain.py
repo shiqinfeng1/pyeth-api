@@ -14,9 +14,12 @@ from ethereum.utils import encode_hex, normalize_address
 from pyethapp.jsonrpc import (
     data_encoder,
 )
+from service.utils import (
+    split_endpoint,
+)
 from rlp.utils import decode_hex
 import json
-import getpass
+
 from exceptions import (
     EthNodeCommunicationError,
 )
@@ -127,27 +130,20 @@ class BlockChainService(object):
     
     def __init__(self):      
         self.blockchain_proxy =  dict()
-        self.adminAddress = constant.ADMIN_ADDRESS
 
     def new_blockchain_proxy(self,
             chain_name,
-            host,
-            port,
-            keystore_path,
-            infura_endpoint=None):
+            endpoint,
+            keystore_path):
         
         self.blockchain_proxy[chain_name] = BlockChainProxy(
             chain_name,
-            host,
-            port,
-            keystore_path,
-            infura_endpoint)
+            endpoint,
+            keystore_path)
         if self.blockchain_proxy[chain_name] == None:
             raise RuntimeError('create BlockChainProxy fail.')
             
-        if infura_endpoint == None:
-            if not check_json_rpc(self.blockchain_proxy[chain_name].jsonrpc_client):
-                raise RuntimeError('BlockChainProxy connect eth-client fail.')
+        
 
         return self.blockchain_proxy[chain_name]
 
@@ -163,29 +159,32 @@ class BlockChainProxy(object):
     def __init__(
             self,
             chain_name,
-            host,
-            port,
-            keystore_path,
-            endpoint=None):
+            endpoint,
+            keystore_path):
             
         self.chain_name = chain_name
-        self.host = host
-        self.port = port
         self.contract_owner_proxy =  dict()
         self.jsonrpc_proxy =  dict()
         self.account_manager = accounts_manager.AccountManager(keystore_path)
-        self.endpoint = endpoint
-        if endpoint == None:
-            self.jsonrpc_client = JSONRPCClient(
-                host,
-                port,
+        self.endpoint = None
+        self.host = None
+        self.port = None
+
+        if endpoint in ['mainnet', 'ropsten', 'kovan', 'rinkeby']:
+            self.endpoint  = 'https://'+endpoint+'.infura.io/SaTkK9e9TKrRuhHg'
+            self.jsonrpc_client = JSONRPCClient_for_infura(
+                self.endpoint,
                 '',
             )
         else:
-            self.jsonrpc_client = JSONRPCClient_for_infura(
-                endpoint,
+            self.host,self.port=split_endpoint(endpoint)
+            self.jsonrpc_client = JSONRPCClient(
+                self.host,
+                self.port,
                 '',
             )
+            if not check_json_rpc(self.jsonrpc_client):
+                raise RuntimeError('BlockChainProxy connect eth-client fail.')
 
     def get_jsonrpc_client(self, sender, password=None):
         if self.jsonrpc_proxy.get(sender) == None:
@@ -194,7 +193,6 @@ class BlockChainProxy(object):
             if len(hexlify(private_key)) != 64:
                 private_key = decode_hex(private_key)
 
-            print('temp : private_key={} type:{} len={}'.format(hexlify(private_key),type(private_key),len(private_key)))
             if self.endpoint == None:
                 self.jsonrpc_proxy[sender] = JSONRPCClient(
                     host = self.host,

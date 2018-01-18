@@ -55,14 +55,6 @@ def toggle_trace_profiler(atmchain):
 
 OPTIONS = [
     click.option(
-        '--keystore-path',
-        help=('If you have a non-standard path for the ethereum keystore directory'
-              ' provide it using this argument.'),
-        default=None,
-        type=click.Path(exists=True),
-        show_default=True,
-    ),
-    click.option(
         '--gas-price',
         help="Set the Ethereum transaction's gas price",
         default=constant.GAS_PRICE,
@@ -117,8 +109,7 @@ def options(func):
 
 @options
 @click.command()
-def app(keystore_path,
-        gas_price,
+def app(gas_price,
         rpccorsdomain,
         rpcaddress,
         rpc,

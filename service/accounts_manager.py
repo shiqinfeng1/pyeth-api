@@ -263,15 +263,22 @@ class AccountManager(object):
                             log.warning('%s %s: %s', msg, fullpath, ex)
 
         if len(self.accounts):
-            if constant.ADMIN_ADDRESS[2:] in self.accounts.keys():
-                self.admin_account = constant.ADMIN_ADDRESS
-            else:
-                self.admin_account = '0x'+self.accounts.keys()[0]
+            self.admin_account = '0x'+self.accounts.keys()[0]
         else:
             self.admin_account = None
 
-    def set_admin_account(self, address):
-        self.admin_account = address
+    def set_admin_account(self, old_address,address):
+        assert isinstance(address,str)
+        assert len(address) == 42 and address[:2]=='0x'
+        
+        password = getpass.getpass('Enter the password to unlock %s: ' % old_address)
+        acc = Account.load(path,password)
+        if acc.locked == False:
+            self.admin_account = address
+            acc.lock()
+        else:
+            print('set admin account fail.')
+        
 
     def address_in_keystore(self, address):
         if address is None:

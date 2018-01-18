@@ -22,13 +22,10 @@ class PYETHAPI(object):
         return self.blockchain_service.adminAddress
     #raise NotImplementedError()
 
-    def new_blockchain_proxy(self, chain_name,host,port,infura_endpoint=None):
+    def new_blockchain_proxy(self, chain_name,endpoint):
         if chain_name not in self.blockchain_service.blockchain_proxy.keys():
-            if infura_endpoint !=None:
-                assert infura_endpoint in ['mainnet', 'ropsten', 'kovan', 'rinkeby']
-                infura_endpoint = 'https://'+infura_endpoint+'.infura.io/SaTkK9e9TKrRuhHg'
             ethereum_proxy = self.blockchain_service.new_blockchain_proxy(
-                chain_name, host, port, os.getcwd()+'/pyethapi/keystore',infura_endpoint)
+                chain_name, endpoint, os.getcwd()+'/pyethapi/keystore')
         return ethereum_proxy
 
     def blockchain_proxy_list(self):
@@ -39,6 +36,10 @@ class PYETHAPI(object):
         assert chain_name in self.blockchain_service.blockchain_proxy.keys()
         _proxy = self.blockchain_service.blockchain_proxy[chain_name]
         return _proxy
+
+    def set_admin_account(self,chain_name,old_address,admin_address):
+        _proxy = self._get_chain_proxy(chain_name)
+        _proxy.account_manager.set_admin_account(old_address,admin_addess)
 
     def new_account(self, chain_name, password=None, key=None):
         assert isinstance(key,str) and len(key)==64

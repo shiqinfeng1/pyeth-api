@@ -21,7 +21,9 @@ from pyethapp.console_service import GeventInputHook, SigINTHandler
 from api.python import PYETHAPI
 from service.utils import  get_contract_path, safe_address_decode,privatekey_to_address
 from binascii import hexlify, unhexlify
-
+from service.utils import (
+    split_endpoint
+)
 # ipython needs to accept "--gui gevent" option
 IPython.core.shellapp.InteractiveShellApp.gui.values += ('gevent',)
 inputhook_manager.register('gevent')(GeventInputHook)
@@ -50,8 +52,8 @@ class ATMChainTools(object):
         print("{:20}: {}".format('keystore_path',proxy.account_manager.keystore_path))
         print("{:20}: {}".format('default accounts',list(proxy.account_manager.accounts.keys())))
 
-    def new_blockchain_proxy(self, chain_name,host,port,infura_endpoint=None):
-        proxy = self.pyeth_api.new_blockchain_proxy(chain_name,host,port,infura_endpoint)
+    def new_blockchain_proxy(self, chain_name,endpoint):
+        proxy = self.pyeth_api.new_blockchain_proxy(chain_name,endpoint)
         self._print_proxy_info(proxy)
 
     def blockchain_proxy_list(self):
@@ -73,6 +75,9 @@ class ATMChainTools(object):
         password = click.prompt('Password to encrypt private key', default='', hide_input=True,
                                 confirmation_prompt=False, show_default=False)
         self.pyeth_api.new_account(chain_name, password, key)
+
+    def set_admin_account(self,chain_name,old_admin_address,new_admin_address):
+        self.pyeth_api.set_admin_account(chain_name,old_admin_address,new_admin_address)
 
     def check_account(self,privkey):
         assert isinstance(privkey,str)
@@ -128,11 +133,6 @@ class AppTools(object):
 
     def switch_sender(self,address): 
         assert isinstance(address,str) 
-        """
-        if address[:2] == '0x':
-            address = address[2:]
-        assert len(address) == 40
-        """
         self.current_sender = address
         print('current_sender: {}'.format(self.current_sender))
 
