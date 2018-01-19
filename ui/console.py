@@ -3,7 +3,7 @@ from __future__ import print_function
 import click
 import cStringIO
 import json
-import sys
+import sys,os
 import time
 from logging import StreamHandler, Formatter
 from flask.json import jsonify
@@ -52,8 +52,12 @@ class ATMChainTools(object):
         print("{:20}: {}".format('keystore_path',proxy.account_manager.keystore_path))
         print("{:20}: {}".format('default accounts',list(proxy.account_manager.accounts.keys())))
 
-    def new_blockchain_proxy(self, chain_name,endpoint):
-        proxy = self.pyeth_api.new_blockchain_proxy(chain_name,endpoint)
+    def new_blockchain_proxy(self, chain_name,endpoint,keystore_path=None):
+        if keystore_path != None:
+            keystore_path = os.path.abspath(keystore_path)
+        else: 
+            keystore_path = os.getcwd()+'/'+sys.argv[0]+'/keystore'
+        proxy = self.pyeth_api.new_blockchain_proxy(chain_name,endpoint,keystore_path)
         self._print_proxy_info(proxy)
 
     def blockchain_proxy_list(self):

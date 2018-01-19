@@ -7,7 +7,12 @@ pyeth-api runs on Python 2.7, for Pyethapp is only support for Python 2.7.
 ## pre-prepare
 1. recommended install pyenv tools to manage virtualenv
 1. install solc
-
+```
+    pip install py-solc
+    python -m solc.install v0.4.15
+    echo "export SOLC_BINARY=/root/.py-solc/solc-v0.4.15/bin/solc" >> ~/.bash_profile  // /etc/bash.bashrc
+    echo $SOLC_BINARY
+```
 ## fetures
 1. auto smart contract deploy
 1. cross-chain ethereum token transfer
@@ -59,10 +64,8 @@ pyeth-api runs on Python 2.7, for Pyethapp is only support for Python 2.7.
   --rpcaddress TEXT     "host:port" for the service to listen on.  [default:
                         0.0.0.0:40001]
   --gas-price INTEGER   Set the Ethereum transaction's gas price  [default:
-                        20000000000]
-  --keystore-path PATH  If you have a non-standard path for the ethereum
-                        keystore directory provide it using this argument.
-  --inst                to start with an app inst. example: atmchain
+                        20,000,000,000]
+  --inst                to start with an app inst. one of [default, atmchain, atmchain_rewards_plan]
   --help                Show this message and exit.
  
   ```

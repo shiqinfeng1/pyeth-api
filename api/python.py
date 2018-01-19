@@ -22,10 +22,11 @@ class PYETHAPI(object):
         return self.blockchain_service.adminAddress
     #raise NotImplementedError()
 
-    def new_blockchain_proxy(self, chain_name,endpoint):
+    def new_blockchain_proxy(self, chain_name,endpoint,keystore_path):
+        assert keystore_path != None
         if chain_name not in self.blockchain_service.blockchain_proxy.keys():
             ethereum_proxy = self.blockchain_service.new_blockchain_proxy(
-                chain_name, endpoint, os.getcwd()+'/pyethapi/keystore')
+                chain_name, endpoint, keystore_path)
         return ethereum_proxy
 
     def blockchain_proxy_list(self):
@@ -49,9 +50,9 @@ class PYETHAPI(object):
         if password is None:
             password = ''
         account = Account.new(password, key=key, uuid=id_)
-        account.path = os.path.join(os.getcwd()+'/pyethapi/keystore', '0x'+encode_hex(account.address))
+        account.path = os.path.join(_proxy.account_manager.keystore_path, '0x'+encode_hex(account.address))
         try:
-            _proxy.account_manager.add_account(account)
+            _proxy.account_manager.add_account(account) 
         except IOError:
             print('Could not write keystore file. Make sure you have write permission in the '
                     'configured directory and check the log for further information.')
