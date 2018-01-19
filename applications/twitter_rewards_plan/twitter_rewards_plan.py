@@ -13,8 +13,15 @@ from binascii import hexlify, unhexlify
 
 log = slogging.getLogger(__name__)
 
-twitter_api = twitter.Api()
+twitter_api = twitter.Api(consumer_key='n3RjtgP7nk1XFAM1ojyJJdo0Z',
+                    consumer_secret='XM4Jmy3acY8Mpd6NXqgTAdJMc4TRZe9lzgAvtSw7KD4zozZPDl',
+                    access_token_key='895821883433549824-rfN94pGkrJpt31hZO15BVjoSuJOshbE',
+                    access_token_secret='tJPLIubFmDkNocLXvYoDnZNDAoKTFr2Bar2smymKk5K90',
+                    timeout = 30)
 screen_name='ATMChainDev'
+all_followers_by_id= dict()
+all_followers_by_name= dict()
+
 
 class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
     def __init__(self,blockchain_service):
@@ -37,7 +44,7 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
             )
         else:
             if contract_address[:2]=='0x':
-                contract_address = contract_address[:2]
+                contract_address = contract_address[2:]
             contract_proxy = _proxy.attach_contract(
                 sender, 
                 unhexlify(contract_address),
@@ -68,6 +75,29 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
 
         _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_unbind_account',user_id)
 
+    def query_bindinfo(self, sender, chain_name, screen_name, contract_address=None):
+        _proxy = self._get_chain_proxy(chain_name)
+        if contract_address == None:
+            contract_proxy = _proxy.get_contract_proxy(
+                sender,
+                'TwitterAccount'
+            )
+        else:
+            if contract_address[:2]=='0x':
+                contract_address = contract_address[:2]
+            contract_proxy = _proxy.attach_contract(
+                sender, 
+                unhexlify(contract_address),
+                'twitter.sol', 'TwitterAccount',
+            )
+        if screen_name not in all_followers_by_name.keys():
+            printf('screen_name: {} is not our followers.'.format(screen_name))
+            return 
+        block_number = _proxy.block_number()
+        txhash = contract_proxy.query_bindinfo(str(all_followers_by_name[screen_name]))
+
+        _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Log_bind_account',str(all_followers_by_name[screen_name]))
+
     def twitter_status_list(self):
         statuses = get_status_list('ATMChainDev')
         for s in statuses:
@@ -79,7 +109,10 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
             print('get_retweeters fail.')
             return 
         for s in retweeters:
-            print('retweeters id = %s'%(s))
+            if s not in all_followers_by_id.keys():
+                print('retweeters id = {:20} not followers '.format(s))
+            else:
+                print('retweeters id = {:20} screen_name = {}'.format(s,all_followers_by_id[s]))
 
     def get_luckyboys(self,sender,chain_name,status_id,luckyboys_num,contract_address=None):
         users_list=list()
@@ -92,7 +125,6 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
             if retweeter in followers:
                 users_list.append(str(retweeter))
 
-        
         print('status_id: {} validate users list= {}'.format(status_id,users_list))
 
         _proxy = self._get_chain_proxy(chain_name)
@@ -117,8 +149,10 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
         r1 = event[0]['luckyboys']
         r2 = event[0]['luckyboys_addr']
         print('\n================= luckyboys list  =================== ')
+        
         for (i1, i2) in zip(r1,r2):
-            print('luckyboys: {:20} address = {} '.format(i1[:i1.find('\x00')],i2))
+            sid = i1[:i1.find('\x00')]
+            print('luckyboys: {:20}({:20}) address = {} '.format(all_followers_by_id[sid],sid,i2))
 
 def print_basicinfo():
     print('================= start running twitter monitor  =================== ')
@@ -148,7 +182,11 @@ def get_followers(screenname):
     users=None
     try:
         users = twitter_api.GetFollowers(screen_name=screenname)
+        all_followers_by_id.clear()
+        all_followers_by_name.clear()
         for u in users:
+            all_followers_by_name[u.name] = u.id
+            all_followers_by_id[u.id] = u.name
             print('[current followers] id = %-20s name = %s'%(u.id,u.name))
     except:
         info=sys.exc_info()
@@ -228,4 +266,4 @@ else:
     t.setDaemon(True)
     t.start()
 """
-
+origin_followers = get_followers('ATMChainDev')

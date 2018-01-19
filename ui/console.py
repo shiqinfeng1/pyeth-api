@@ -121,14 +121,9 @@ class ATMChainTools(object):
     def settle_ATM(self,scaner,settle_amount):
         self.pyeth_api.settle_ATM('ethereum','quorum',scaner,settle_amount)
 
-    def transfer_ATM(self,chain_name,sender,to,amount):
-        if chain_name == 'quorum':
-            self.pyeth_api.transfer_ATM(chain_name,'ERC223Token',sender,to,amount,True)
-        elif chain_name == 'ethereum':
-            self.pyeth_api.transfer_ATM(chain_name,'ERC20Token',sender,to,amount)
-        else:
-            print('unkonw chain name: {}'.format(chain_name))
-            return
+    def transfer_ATM(self,chain_name,sender,to,amount,is_erc223):
+        
+        self.pyeth_api.transfer_token(chain_name,contract_address,sender,to,amount,is_erc223)
 
 class AppTools(object):
     def __init__(self, chain):
@@ -137,6 +132,7 @@ class AppTools(object):
 
     def switch_sender(self,address): 
         assert isinstance(address,str) 
+        assert address[:2] == '0x'
         self.current_sender = address
         print('current_sender: {}'.format(self.current_sender))
 
@@ -158,6 +154,12 @@ class AppTools(object):
             self.current_sender = _proxy.account_manager.admin_account
         self.chain.pyeth_api.unbind_account(self.current_sender,chain_name,user_id,contract_address)
     
+    def query_bindinfo(self,chain_name, screen_name,contract_address=None): 
+        _proxy = self.chain.pyeth_api._get_chain_proxy(chain_name)
+        if self.current_sender == None:
+            self.current_sender = _proxy.account_manager.admin_account
+        self.chain.pyeth_api.query_bindinfo(self.current_sender,chain_name,screen_name,contract_address)
+
     def twitter_status_list(self): 
         self.chain.pyeth_api.twitter_status_list()
 

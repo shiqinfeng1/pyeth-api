@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 from ethereum.utils import normalize_address
 from binascii import hexlify, unhexlify
@@ -103,9 +104,6 @@ class PYETHAPI(object):
             )
         return _contract_proxy.address if _contract_proxy != None else None
 
-    def _transfer_eth(self,chain_name,sender,to,amount):
-        _proxy = self._get_chain_proxy(chain_name)
-
 class PYETHAPI_ATMCHAIN(PYETHAPI):
     def __init__(self,blockchain_service):
         print('init PYETHAPI_ATMCHAIN ...')
@@ -169,19 +167,20 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
             )
 
     def transfer_eth(self,chain_name,sender,to,amount):
-        self._transfer_eth(
-            chain_name,
-            sender,
-            to,
-        )
-    def transfer_ATM(self,chain_name,erctoken_name,sender,to,amount,is_erc223=False):
         _proxy = self._get_chain_proxy(chain_name)
-        contract_proxy = _proxy.get_contract_proxy(
+        amount = amount * constant.WEI_TO_ETH
+        _proxy.transfer_eth(sender,to,amount)
+    
+    def transfer_token(self,chain_name,contract_address,sender,to,amount,is_erc223=False):
+        _proxy = self._get_chain_proxy(chain_name)
+        contract_proxy = _proxy.attach_contract(
             sender,
-            chain_name,
-            erctoken_name
+            contract_address,
+            'Token.sol',
+            'Token',
         )
         block_number = _proxy.block_number()
+        #由于pythpn版本以太坊暂时无法处理同名函数, 暂时通过flag来区分
         if is_erc223 == True:
             txhash = contract_proxy.transfer(to,amount*constant.ATM_DECIMALS,'')
         else:

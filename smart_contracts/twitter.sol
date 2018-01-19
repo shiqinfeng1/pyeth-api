@@ -38,7 +38,7 @@ contract TwitterAccount is  Owned {
     event Log_bind_account(bytes32 _id, address _addr);
     event Log_unbind_account(bytes32 _id);
     event Log_lotus_result(bytes32 _id, bytes32[] luckyboys,address[] luckyboys_addr);
-    
+
     mapping(bytes32 => address) public accounts; //用户绑定的地址列表
     mapping(bytes32 => bytes32[]) public retweeters; //保存retweet_id对应的转发用户列表
     /*
@@ -80,8 +80,11 @@ contract TwitterAccount is  Owned {
         accounts[_id] = _addr;
         Log_bind_account( _id,  _addr);
     }
-     function unbind_account(bytes32 _id) public onlyOwner {
+    function unbind_account(bytes32 _id) public onlyOwner {
         delete accounts[_id];
         Log_unbind_account( _id);
+    }
+    function query_bindinfo(bytes32 _id) public {
+        Log_bind_account(_id, accounts[_id]);
     }
 }
