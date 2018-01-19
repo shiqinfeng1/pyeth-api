@@ -13,11 +13,7 @@ from binascii import hexlify, unhexlify
 
 log = slogging.getLogger(__name__)
 
-twitter_api = twitter.Api(consumer_key='n3RjtgP7nk1XFAM1ojyJJdo0Z',
-                    consumer_secret='XM4Jmy3acY8Mpd6NXqgTAdJMc4TRZe9lzgAvtSw7KD4zozZPDl',
-                    access_token_key='895821883433549824-rfN94pGkrJpt31hZO15BVjoSuJOshbE',
-                    access_token_secret='tJPLIubFmDkNocLXvYoDnZNDAoKTFr2Bar2smymKk5K90',
-                    timeout = 30)
+twitter_api = twitter.Api()
 screen_name='ATMChainDev'
 
 class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
@@ -225,7 +221,7 @@ if __name__ == '__main__':
     gevent.signal(signal.SIGTERM, event.set)
     gevent.signal(signal.SIGINT, event.set)
     event.wait()
-""" do not start a thread for twitter warning: 'Rate limit exceeded'
+""" do not start a thread because of twitter warning: 'Rate limit exceeded'
 else:
     twitter_monitor = TwitterMonitor()
     t = threading.Thread(target=twitter_monitor.run_task)
