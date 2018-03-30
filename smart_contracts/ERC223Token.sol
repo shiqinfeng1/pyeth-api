@@ -13,7 +13,7 @@ Machine-based, rapid creation of many tokens would not necessarily need these ex
 import "./StandardToken.sol";
 import "./ContractReceiver.sol";
 
-pragma solidity ^0.4.15;
+pragma solidity ^0.4.14;
 
 contract ERC223Token is StandardToken {
 

@@ -62,6 +62,18 @@ class ChainSchema(BaseSchema):
     class Meta:
         strict = True
         decoding_class = dict
+        
+class TokenSchema(BaseSchema):
+    chain_name = fields.String(missing=None)
+    user_address = AddressField(missing=None)
+    decimals = fields.Integer(missing=None)
+    total_suply = fields.Integer(missing=None)
+    name = fields.String(missing=None)
+    symbol = fields.String(missing=None)
+
+    class Meta:
+        strict = True
+        decoding_class = dict
 
 class HexAddressConverter(BaseConverter):
     def to_python(self, value):

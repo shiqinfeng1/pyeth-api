@@ -1,7 +1,7 @@
 import os
 import json
 import hashlib
-
+import warnings
 from ethereum import _solidity
 from ethereum.utils import sha3, is_string, encode_hex, remove_0x_head, to_string
 from utils import get_contract_path

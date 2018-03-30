@@ -14,6 +14,7 @@ from ethereum.utils import encode_hex, normalize_address
 from pyethapp.jsonrpc import (
     data_encoder,
 )
+import warnings
 from service.utils import (
     split_endpoint,
 )
@@ -309,13 +310,13 @@ class BlockChainProxy(object):
 
         path = get_contract_path(contract_file)
         workdir, filename = os.path.split(path)
-        log.info('deploying contract: [{} {}] sender: {} workdir: {} ...'.format(
-            contract_name,constructor_parameters,sender,workdir))
-
+        log.info('\ndeploying contract: {}. Paras:{}. \nsender: {}. \nworkdir: {}.\n'.format(
+            contract_name,constructor_parameters,sender,path))
+        all_contracts = compile_file(path, libraries=dict())
         contract_proxy = client.deploy_solidity_contract(
             unhexlify(sender[2:]),
             contract_name, #contract_name
-            compile_file(path, libraries=dict()), #all_contracts
+            all_contracts, #all_contracts
             dict(),  #libraries dict()
             constructor_parameters, #constructor_parameters tuple() (p1, p2, p3, p4)
             contract_path = path,
@@ -573,7 +574,6 @@ class JSONRPCClient(object):
 
                 dependency_contract['bin_hex'] = hex_bytecode
                 dependency_contract['bin'] = bytecode
-
                 transaction_hash_hex = self.send_transaction(
                     sender,
                     to='',
@@ -584,7 +584,6 @@ class JSONRPCClient(object):
 
                 self.poll(transaction_hash, timeout=timeout)
                 receipt = self.eth_getTransactionReceipt(transaction_hash)
-
                 contract_address = receipt['contractAddress']
                 # remove the hexadecimal prefix 0x from the address
                 contract_address = contract_address[2:]
@@ -601,14 +600,12 @@ class JSONRPCClient(object):
 
             contract['bin_hex'] = hex_bytecode
             contract['bin'] = bytecode
-
         if constructor_parameters:
             translator = ContractTranslator(contract_interface)
             parameters = translator.encode_constructor_arguments(constructor_parameters)
             bytecode = contract['bin'] + parameters
         else:
             bytecode = contract['bin']
-
         transaction_hash_hex = self.send_transaction(
             sender,
             to='',
@@ -616,7 +613,6 @@ class JSONRPCClient(object):
             gasprice=gasprice,
         )
         transaction_hash = unhexlify(transaction_hash_hex)
-
         self.poll(transaction_hash, timeout=timeout)
         receipt = self.eth_getTransactionReceipt(transaction_hash)
         contract_address = receipt['contractAddress']
@@ -738,6 +734,7 @@ class JSONRPCClient(object):
                 - Data arguments must be hex encoded starting with '0x'
         """
         request = self.protocol.create_request(method, args)
+        log.info("\nRPC Request: {}".format(request.serialize()))
         reply = self.transport.send_message(request.serialize())
 
         jsonrpc_reply = self.protocol.parse_reply(reply)
@@ -763,7 +760,6 @@ class JSONRPCClient(object):
         locally sign the transaction. This requires an extended server
         implementation that accepts the variables v, r, and s.
         """
-
         if not self.privkey and not sender:
             raise ValueError('Either privkey or sender needs to be supplied.')
 
@@ -785,7 +781,6 @@ class JSONRPCClient(object):
             startgas = self.gaslimit() / 3
 
         tx = Transaction(nonce, gasprice, startgas, to=to, value=value, data=data)
-
         if self.privkey:
             tx.sign(self.privkey)
             result = self.call(
@@ -802,7 +797,6 @@ class JSONRPCClient(object):
             tx_dict['sender'] = sender
             tx_dict['gasPrice'] = tx_dict.pop('gasprice')
             tx_dict['gas'] = tx_dict.pop('startgas')
-
             res = self.eth_sendTransaction(**tx_dict)
 
         assert len(res) in (20, 32)

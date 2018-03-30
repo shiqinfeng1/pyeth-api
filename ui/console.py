@@ -13,7 +13,6 @@ import IPython
 from IPython.lib.inputhook import inputhook_manager
 from devp2p.service import BaseService
 from ethereum.slogging import getLogger
-from ethereum._solidity import compile_file
 from ethereum.utils import denoms
 from pyethapp.utils import bcolors as bc
 from pyethapp.jsonrpc import default_gasprice

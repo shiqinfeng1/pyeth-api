@@ -1,5 +1,4 @@
-pragma solidity ^0.4.15;
-
+pragma solidity ^0.4.14;
 contract ERC20Token {
     /* This is a slight change to the ERC20 base standard.
     function totalSupply() constant returns (uint256 supply);

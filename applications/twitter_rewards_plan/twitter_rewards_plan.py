@@ -12,12 +12,13 @@ from ethereum import slogging
 from binascii import hexlify, unhexlify
 
 log = slogging.getLogger(__name__)
-
+"""
 twitter_api = twitter.Api(consumer_key='n3RjtgP7nk1XFAM1ojyJJdo0Z',
                     consumer_secret='XM4Jmy3acY8Mpd6NXqgTAdJMc4TRZe9lzgAvtSw7KD4zozZPDl',
                     access_token_key='895821883433549824-rfN94pGkrJpt31hZO15BVjoSuJOshbE',
                     access_token_secret='tJPLIubFmDkNocLXvYoDnZNDAoKTFr2Bar2smymKk5K90',
                     timeout = 30)
+"""
 screen_name='ATMChainDev'
 all_followers_by_id= dict()
 all_followers_by_name= dict()

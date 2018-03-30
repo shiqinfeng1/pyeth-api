@@ -1,4 +1,4 @@
-pragma solidity ^0.4.15;
+pragma solidity ^0.4.14;
 
 contract Owned {
     /// @dev `owner` is the only address that can call a function with this
@@ -50,8 +50,6 @@ contract TwitterAccount is  Owned {
         
         bytes32[] memory valid_users_list = new bytes32[](users_list.length); //转发的用户id中,已绑定地址的用户
         address[] memory users_addr = new address[](users_list.length); //转发的用户id中,已绑定地址的用户的以太坊地址
-        bytes32[] memory luckyboys = new bytes32[](luckyboys_num);  //中奖用户id
-        address[] memory luckyboys_addr = new address[](luckyboys_num); //中奖用户地址
         
         retweeters[retweet_id] = users_list; //记录该推文在当前时间点被哪些用户转发
         
@@ -65,13 +63,22 @@ contract TwitterAccount is  Owned {
                 total_users = total_users+1;
             }
         }
-        
+        if (luckyboys_num  > total_users){
+            luckyboys_num  = total_users;
+        }
+        bytes32[] memory luckyboys = new bytes32[](luckyboys_num);  //中奖用户id
+        address[] memory luckyboys_addr = new address[](luckyboys_num); //中奖用户地址
+        uint8[] memory is_selected = new uint8[](total_users); //记录当前用户是否已被抽中过
         //随机抽取中奖用户
         for(uint j=0;j<luckyboys_num;j++){
             //addmod(a,b,c) 取模算法: (a+b)%c
             uint temp = uint(block.blockhash(block.number-j-1))%total_users;//addmod(uint(block.blockhash(block.number-j-1)),0,total_users);
+            while (is_selected[temp] == 1){ //当前用户已经被抽中过
+                temp = (temp+1) % total_users;
+            }
             luckyboys_addr[j] = users_addr[temp];
             luckyboys[j] = valid_users_list[temp]; 
+            is_selected[temp] = 1;
         }
         
         Log_lotus_result(retweet_id,luckyboys,luckyboys_addr);

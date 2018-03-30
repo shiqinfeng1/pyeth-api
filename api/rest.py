@@ -4,13 +4,14 @@ from flask_restful import Api, abort
 from flask_cors import CORS
 from webargs.flaskparser import parser
 from pyethapp.jsonrpc import address_encoder
-
+from binascii import hexlify
 from api.v1.encoding import (
     HexAddressConverter,
 )
 from api.v1.resources import (
     create_blueprint,
     AddressResource,
+    TokensResource,
 )
 
 class APIServer(object):
@@ -42,6 +43,7 @@ class APIServer(object):
 
     def _add_default_resources(self):
         self.add_resource(AddressResource, '/adminAddress')
+        self.add_resource(TokensResource, '/asset')
         """
         self.add_resource(ChannelsResource, '/channels')
         self.add_resource(
@@ -92,3 +94,18 @@ class RestAPI(object):
 
     def get_admin_address(self):
         return {'admin_address': self.pyeth_api.adminAddress}
+
+    def deploy_contract(self,chain,user_address,decimals,total_suply,name,symbol):
+        ethereum_proxy = self.pyeth_api._get_chain_proxy(chain)
+        ethereum_sender = ethereum_proxy.account_manager.admin_account
+
+        userToken = self.pyeth_api._deploy_contract( 
+            ethereum_sender, 
+            chain,
+            'userToken.sol', 'userToken',
+            (hexlify(user_address),total_suply,hexlify(symbol),decimals,hexlify(name)),
+            password = '123456',
+        )
+        address = userToken.address
+        print("deployed address:", hexlify(address))
+        return {'contract_address': hexlify(address)}

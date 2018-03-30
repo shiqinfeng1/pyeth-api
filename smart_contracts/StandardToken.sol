@@ -6,7 +6,7 @@ If you deploy this, you won't have anything useful.)
 
 Implements ERC 20 Token standard: https://github.com/ethereum/EIPs/issues/20
 .*/
-pragma solidity ^0.4.15;
+pragma solidity ^0.4.14;
 
 import "./Token.sol";
 import "./ContractReceiver.sol";
@@ -65,7 +65,7 @@ contract StandardToken is Token {
 
     //assemble the given address bytecode. If bytecode exists then the _addr is a contract.
     function isContract(address _addr)
-        private view
+        private 
         returns (bool)
     {
         uint length;

@@ -3,7 +3,9 @@
 from webargs.flaskparser import use_kwargs
 from flask_restful import Resource
 from flask import Blueprint
-
+from api.v1.encoding import (
+    TokenSchema,
+)
 
 def create_blueprint():
     # Take a look at this SO question on hints how to organize versioned
@@ -17,6 +19,23 @@ class BaseResource(Resource):
         super(BaseResource, self).__init__()
         self.rest_api = kwargs['rest_api_object']
 
+class TokensResource(BaseResource):
+    
+    post_schema = TokenSchema()
+
+    def __init__(self, **kwargs):
+        super(TokensResource, self).__init__(**kwargs)
+
+    @use_kwargs(post_schema, locations=('json',))
+    def post(self, chain_name,user_address,decimals,total_suply,name,symbol):
+        return self.rest_api.deploy_contract(
+            chain = chain_name,
+            user_address=user_address,
+            decimals=decimals,
+            total_suply=total_suply,
+            name=name,
+            symbol=symbol,
+        )
 
 class AddressResource(BaseResource):
 
