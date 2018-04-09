@@ -12,6 +12,17 @@ event返回数据的list元素结构举例:
 } 
 """
 
+def Token_Transfer_filter_condition(_to):
+    
+    def filter(event):
+        if event['_event_type'] != 'Transfer':
+            return False
+        if normalize_address(event['_to']) ==  normalize_address(_to):
+            return True
+        return False
+
+    return filter
+
 def ERC223Token_Minted_filter_condition(_to):
     
     def filter(event):
@@ -101,17 +112,39 @@ def TwitterAccount_Log_bind_account_filter_condition(_id):
 
     return filter
 
+def HomeBridge_Deposit_filter_condition():
+    def filter(event):
+        if event['_event_type'] != 'Deposit':
+            return False
+        return True
+    return filter
+
+def HomeBridge_Withdraw_filter_condition():
+    def filter(event):
+        if event['_event_type'] != 'Withdraw':
+            return False
+        return True
+    return filter
+
+
 __conditionSet__ = {
+    'ATMToken_Transfer': Token_Transfer_filter_condition,
+    'Token_Transfer': Token_Transfer_filter_condition,
+
     'ERC223Token_Minted': ERC223Token_Minted_filter_condition,
     'ERC223Token_Transfer': ERC223Token_Transfer_filter_condition,
+
     'TokenExchange_LogLockToken':TokenExchange_LogLockToken_filter_condition,
     'TokenExchange_LogSettleToken':TokenExchange_LogSettleToken_filter_condition,
+
     'TwitterAccount_Log_bind_account': TwitterAccount_Log_bind_account_filter_condition,
     'TwitterAccount_Log_unbind_account': TwitterAccount_Log_unbind_account_filter_condition,
     'TwitterAccount_Log_lotus_result': TwitterAccount_Log_lotus_result_filter_condition,
     'TwitterAccount_Log_lotus': TwitterAccount_Log_lotus_filter_condition,
-}
 
+    'HomeBridge_Deposit': HomeBridge_Deposit_filter_condition,
+    'HomeBridge_Withdraw': HomeBridge_Withdraw_filter_condition,
+}
 
     
 

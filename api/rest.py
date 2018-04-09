@@ -97,11 +97,8 @@ class RestAPI(object):
 
     def deploy_contract(self,chain,user_address,decimals,total_suply,name,symbol):
         ethereum_proxy = self.pyeth_api._get_chain_proxy(chain)
-        ethereum_sender = ethereum_proxy.account_manager.admin_account
-
-        userToken = self.pyeth_api._deploy_contract( 
-            ethereum_sender, 
-            chain,
+        userToken = ethereum_proxy.deploy_contract( 
+            ethereum_proxy.account_manager.admin_account, 
             'userToken.sol', 'userToken',
             (hexlify(user_address),total_suply,hexlify(symbol),decimals,hexlify(name)),
             password = '123456',

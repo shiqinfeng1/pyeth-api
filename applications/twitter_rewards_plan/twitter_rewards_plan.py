@@ -12,6 +12,7 @@ from ethereum import slogging
 from binascii import hexlify, unhexlify
 
 log = slogging.getLogger(__name__)
+
 """
 twitter_api = twitter.Api(consumer_key='n3RjtgP7nk1XFAM1ojyJJdo0Z',
                     consumer_secret='XM4Jmy3acY8Mpd6NXqgTAdJMc4TRZe9lzgAvtSw7KD4zozZPDl',
@@ -30,27 +31,23 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
         super(PYETHAPI_ATMCHAIN_REWARDS_PLAN, self).__init__(blockchain_service)
 
     def deploy_twitter_rewards_contract(self,sender,chain_name): 
-        self._deploy_contract( 
-            sender, 
-            chain_name,
+        _proxy = self._get_chain_proxy(chain_name)
+        contract_proxy = _proxy.deploy_contract( 
+            sender,
             'twitter.sol', 'TwitterAccount',
+            tuple()
             )
 
     def bind_account(self,sender,chain_name, user_id, user_addr,contract_address=None):
         _proxy = self._get_chain_proxy(chain_name)
-        if contract_address == None:
-            contract_proxy = _proxy.get_contract_proxy(
-                sender,
-                'TwitterAccount'
-            )
-        else:
-            if contract_address[:2]=='0x':
-                contract_address = contract_address[2:]
-            contract_proxy = _proxy.attach_contract(
-                sender, 
-                unhexlify(contract_address),
-                'twitter.sol', 'TwitterAccount',
-            )
+        if contract_address[:2]=='0x':
+            contract_address = contract_address[2:]
+        contract_proxy = _proxy.attach_contract(
+            'TwitterAccount',
+            contract_file='twitter.sol', 
+            contract_address=unhexlify(contract_address),
+            attacher=sender, 
+        )
         block_number = _proxy.block_number()
         txhash = contract_proxy.bind_account(user_id, user_addr)
 
@@ -58,19 +55,14 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
 
     def unbind_account(self,sender,chain_name, user_id,contract_address=None):
         _proxy = self._get_chain_proxy(chain_name)
-        if contract_address == None:
-            contract_proxy = _proxy.get_contract_proxy(
-                sender,
-                'TwitterAccount'
-            )
-        else:
-            if contract_address[:2]=='0x':
-                contract_address = contract_address[:2]
-            contract_proxy = _proxy.attach_contract(
-                sender, 
-                unhexlify(contract_address),
-                'twitter.sol', 'TwitterAccount',
-            )
+        if contract_address[:2]=='0x':
+            contract_address = contract_address[:2]
+        contract_proxy = _proxy.attach_contract(
+            'TwitterAccount',
+            contract_file='twitter.sol', 
+            contract_address=unhexlify(contract_address),
+            attacher=sender, 
+        )
         block_number = _proxy.block_number()
         txhash = contract_proxy.bind_account(user_id)
 
@@ -78,19 +70,14 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
 
     def query_bindinfo(self, sender, chain_name, screen_name, contract_address=None):
         _proxy = self._get_chain_proxy(chain_name)
-        if contract_address == None:
-            contract_proxy = _proxy.get_contract_proxy(
-                sender,
-                'TwitterAccount'
-            )
-        else:
-            if contract_address[:2]=='0x':
-                contract_address = contract_address[:2]
-            contract_proxy = _proxy.attach_contract(
-                sender, 
-                unhexlify(contract_address),
-                'twitter.sol', 'TwitterAccount',
-            )
+        if contract_address[:2]=='0x':
+            contract_address = contract_address[:2]
+        contract_proxy = _proxy.attach_contract(
+            'TwitterAccount',
+            contract_address=unhexlify(contract_address),
+            contract_file='twitter.sol', 
+            attacher=sender, 
+        )
         if screen_name not in all_followers_by_name.keys():
             printf('screen_name: {} is not our followers.'.format(screen_name))
             return 
@@ -129,19 +116,14 @@ class PYETHAPI_ATMCHAIN_REWARDS_PLAN(PYETHAPI_ATMCHAIN):
         print('status_id: {} validate users list= {}'.format(status_id,users_list))
 
         _proxy = self._get_chain_proxy(chain_name)
-        if contract_address == None:
-            contract_proxy = _proxy.get_contract_proxy(
-                sender,
-                'TwitterAccount'
-            )
-        else:
-            if contract_address[:2]=='0x':
-                contract_address = contract_address[:2]
-            contract_proxy = _proxy.attach_contract(
-                sender, 
-                unhexlify(contract_address),
-                'twitter.sol', 'TwitterAccount',
-            )
+        if contract_address[:2]=='0x':
+            contract_address = contract_address[:2]
+        contract_proxy = _proxy.attach_contract(
+            'TwitterAccount',
+            contract_address=unhexlify(contract_address),
+            contract_file='twitter.sol', 
+            attacher=sender, 
+        )
         block_number = _proxy.block_number()
         txhash = contract_proxy.lotus(luckyboys_num, status_id, users_list)
 

@@ -29,10 +29,7 @@ inputhook_manager.register('gevent')(GeventInputHook)
 
 
 def ATMChain_print_usage():
-    print("\t{}use `{}account{}` to interact with the account manager.".format(
-        bc.OKBLUE, bc.HEADER, bc.OKBLUE))
     print("\tuse `{}chain{}` to interact with the blockchain.".format(bc.HEADER, bc.OKBLUE))
-    print("\tuse `{}help(<topic>){}` for help on a specific topic.".format(bc.HEADER, bc.OKBLUE))
     print("\ttype `{}usage(){}` to see this help again.".format(bc.HEADER, bc.OKBLUE))
     print("\n" + bc.ENDC)
 
@@ -64,8 +61,8 @@ class ATMChainTools(object):
             v=self.pyeth_api._get_chain_proxy(k)
             self._print_proxy_info(v)
 
-    def query_eth_balance(self,chain_name,account):
-        result = self.pyeth_api.query_eth_balance(chain_name,account)
+    def query_currency_balance(self,chain_name,account):
+        result = self.pyeth_api.query_currency_balance(chain_name,account)
         print('------------------------------------')
         print('{:<30}: {:,}'.format(account, result))
 
@@ -104,27 +101,26 @@ class ATMChainTools(object):
         print('------------------------------------\n[ethereum user accounts]:')
         for k, v in enumerate(a1):
             print('{}: {}'.format(k,'0x'+v))
-        print('------------------------------------\n[quorum user accounts]:')
+        print('------------------------------------\n[atmchain user accounts]:')
         for k, v in enumerate(a2):
             print('{}: {}'.format(k,'0x'+v))
 
     def query_atmchain_balance(self,account):
-        result = self.pyeth_api.query_atmchain_balance('ethereum','quorum',account)
+        result = self.pyeth_api.query_atmchain_balance('ethereum','atmchain',account)
         print('------------------------------------')
         for key in sorted(result.keys()):
             print('{:<30}: {:,}'.format(key, result[key]))
 
     def lock_ATM(self,adviser,lock_amount):
-        self.pyeth_api.lock_ATM('ethereum','quorum',adviser,lock_amount)
+        self.pyeth_api.lock_ATM('ethereum','atmchain',adviser,lock_amount)
 
     def settle_ATM(self,scaner,settle_amount):
-        self.pyeth_api.settle_ATM('ethereum','quorum',scaner,settle_amount)
+        self.pyeth_api.settle_ATM('ethereum','atmchain',scaner,settle_amount)
 
     def transfer_ATM(self,chain_name,sender,to,amount,is_erc223):
-        
         self.pyeth_api.transfer_token(chain_name,contract_address,sender,to,amount,is_erc223)
 
-class AppTools(object):
+class AppTwitterTools(object):
     def __init__(self, chain):
         self.chain = chain
         self.current_sender = None
@@ -189,11 +185,11 @@ class Console(object):
     def start(self):
         # start console service
         ATMChain_tools=ATMChainTools(self.pyeth_api)
-        App_tools=AppTools(ATMChain_tools)
+        App_twitter_tools=AppTwitterTools(ATMChain_tools)
         self.console_locals  = dict(
             chain=ATMChain_tools,
-            app_twitter=App_tools,
-            ATMChainUsage=ATMChain_print_usage,
+            app_twitter=App_twitter_tools,
+            usage=ATMChain_print_usage,
         )
 
     def run(self):

@@ -53,6 +53,7 @@ class ContractProxy(object):
         reload custom_contract_events module to get latest custom event filters
         """
         reload(custom_contract_events)
+        event = list()
         event_key = contract_name+'_'+event_name
         if event_key in custom_contract_events.__conditionSet__.keys(): 
             condition = custom_contract_events.__conditionSet__[event_key]
@@ -64,13 +65,9 @@ class ContractProxy(object):
                 )
             log.info('Polled event(with filter {}): {}'.format(event_key,event))
         else:
-            event = self.jsonrpc_client.poll_contract_events(
-                self.address,
-                self.translator,
-                fromBlock
-                )
-            log.info('Polled event(without filter.unknow event_key={}): {}'.format(event_key,event))
+            log.info('unknow event_key={})'.format(event_key))
         return event_key,event
+
 class MethodProxy(object):
     """ A callable interface that exposes a contract function. """
     valid_kargs = set(('gasprice', 'startgas', 'value'))

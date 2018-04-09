@@ -10,13 +10,11 @@ from service.utils import (
 )
 from api.rest import APIServer, RestAPI
 from ethereum import slogging
-from api.python import PYETHAPI
-from applications.twitter_rewards_plan.twitter_rewards_plan import PYETHAPI_ATMCHAIN_REWARDS_PLAN
 from api.python import PYETHAPI_ATMCHAIN
+from applications.twitter_rewards_plan.twitter_rewards_plan import PYETHAPI_ATMCHAIN_REWARDS_PLAN
 from ui.console import Console
 
 pyethapi = dict()
-pyethapi['default'] = PYETHAPI
 pyethapi['atmchain'] = PYETHAPI_ATMCHAIN
 pyethapi['atmchain_rewards_plan'] = PYETHAPI_ATMCHAIN_REWARDS_PLAN
 
@@ -94,7 +92,7 @@ OPTIONS = [
         help=(
             'Start with specified business.'
         ),
-        default='atmchain_rewards_plan',
+        default='atmchain',
         type=str,
         show_default=True,
     ),
@@ -128,7 +126,7 @@ def  _get_pyeth_api(inst,blockchain_proxy):
     if inst in pyethapi.keys():
         pyeth_api = pyethapi[inst](blockchain_proxy)
     else:
-        pyeth_api = pyethapi['default'](blockchain_proxy)
+        pyeth_api = pyethapi['atmchain'](blockchain_proxy)
     return pyeth_api
 
 @click.group(invoke_without_command=True)

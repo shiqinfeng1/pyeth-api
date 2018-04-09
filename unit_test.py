@@ -22,17 +22,17 @@ blockchain_service = BlockChainService()
 
 @click.command()
 @click.option('--eth', default='localhost:8545', help='<ip:port> of ethereum client.')
-@click.option('--quorum', prompt='localhost:40001', help='<ip:port> of quorum client.')
-def demo(eth,quorum):
+@click.option('--atmchain', prompt='localhost:40001', help='<ip:port> of atmchain client.')
+def demo(eth,atmchain):
     
     h1,p1=split_endpoint(eth)
-    h2,p2=split_endpoint(quorum)
+    h2,p2=split_endpoint(atmchain)
     """connect to ethereum client"""
     ethereum_proxy = blockchain_service.new_blockchain_proxy(
         'ethereum_proxy', h1,p1,os.getcwd()+'/keystore')
 
-    quorum_proxy = blockchain_service.new_blockchain_proxy(
-        'quorum_proxy', h2,p2,os.getcwd()+'/keystore')
+    atmchain_proxy = blockchain_service.new_blockchain_proxy(
+        'atmchain_proxy', h2,p2,os.getcwd()+'/keystore')
     
     """users for tests"""
     owner =  '0xa1629411f4e8608a7bb88e8a7700f11c59175e72'
@@ -45,9 +45,9 @@ def demo(eth,quorum):
         sender=owner,to=user_1,eth_amount=321,password='123456') # first execution needs password to unlock
     ethereum_proxy.poll_contarct_transaction_result(txhash)
 
-    txhash=quorum_proxy.transfer_eth(
+    txhash=atmchain_proxy.transfer_eth(
         sender=owner,to=user_1,eth_amount=123,password='123456')
-    quorum_proxy.poll_contarct_transaction_result(txhash)
+    atmchain_proxy.poll_contarct_transaction_result(txhash)
 
     """test deploy contract"""
     print '222222222222222222222222222222222222222222222222'
@@ -56,7 +56,7 @@ def demo(eth,quorum):
         'ERC223Token.sol', 'ERC223Token',
         (100000,'REX',18,'REX Token')
         )
-    ERC223Token_quorum_owner = quorum_proxy.deploy_contract( 
+    ERC223Token_atmchain_owner = atmchain_proxy.deploy_contract( 
         owner, 
         'ERC223Token.sol', 'ERC223Token',
         (100000,'REX',18,'REX Token')
@@ -96,10 +96,10 @@ def demo(eth,quorum):
             .format(idx, addr,
             ethereum_proxy.balance(address_decoder(addr))/WEI_TO_ETH,
             ERC223Token_ethereum_owner.balanceOf(addr)/ATM_DECIMALS))
-        print("[{:3d}]quorum account: 0x{} \nbalance:{} ETH \nbalance:{} REX"
+        print("[{:3d}]atmchain account: 0x{} \nbalance:{} ETH \nbalance:{} REX"
             .format(idx, addr,
             ethereum_proxy.balance(address_decoder(addr))/WEI_TO_ETH,
-            ERC223Token_quorum_owner.balanceOf(addr)/ATM_DECIMALS))
+            ERC223Token_atmchain_owner.balanceOf(addr)/ATM_DECIMALS))
 
 if __name__ == '__main__':
     slogging.configure(':DEBUG')

@@ -4,6 +4,7 @@ import os
 import sys
 import rlp
 import re
+import warnings
 import gevent
 from gevent.lock import Semaphore
 from ethereum import slogging
@@ -14,7 +15,7 @@ from ethereum.utils import encode_hex, normalize_address
 from pyethapp.jsonrpc import (
     data_encoder,
 )
-import warnings
+
 from service.utils import (
     split_endpoint,
 )
@@ -92,6 +93,7 @@ def check_node_connection(func):
 
     return retry_on_disconnect
 
+"""检查客户端通信是否正常"""
 def check_json_rpc(client):
     try:
         client_version = client.call('web3_clientVersion')
@@ -127,11 +129,13 @@ def check_json_rpc(client):
 
     return True
 
+"""链服务：新建链代理，及获取链代理"""
 class BlockChainService(object):
     
     def __init__(self):      
         self.blockchain_proxy =  dict()
 
+    """新建链代理"""
     def new_blockchain_proxy(self,
             chain_name,
             endpoint,
@@ -143,11 +147,10 @@ class BlockChainService(object):
             keystore_path)
         if self.blockchain_proxy[chain_name] == None:
             raise RuntimeError('create BlockChainProxy fail.')
-            
-        
 
         return self.blockchain_proxy[chain_name]
-
+    
+    """获取链代理"""
     def get_blockchain_proxy(self,chain_name):
         if self.blockchain_proxy[chain_name] == None:
             log.info("blockchain {} not registered!".format(chain_name))
@@ -164,104 +167,98 @@ class BlockChainProxy(object):
             keystore_path):
             
         self.chain_name = chain_name
-        self.contract_owner_proxy =  dict()
-        self.jsonrpc_proxy =  dict()
+        self.contract_proxy_with_owner =  dict()
+        self.jsonrpc_proxys =  dict()
         self.account_manager = accounts_manager.AccountManager(keystore_path)
-        self.endpoint = None
+        self.third_party_endpoint = None
         self.host = None
         self.port = None
-
+        
+        """如果是第三方节点地址"""
         if endpoint in ['mainnet', 'ropsten', 'kovan', 'rinkeby']:
-            self.endpoint  = 'https://'+endpoint+'.infura.io/SaTkK9e9TKrRuhHg'
-            self.jsonrpc_client = JSONRPCClient_for_infura(
+            self.third_party_endpoint  = 'https://'+endpoint+'.infura.io/SaTkK9e9TKrRuhHg'
+            self.jsonrpc_client_without_sender = JSONRPCClient_for_infura(
                 self.endpoint,
                 '',
             )
         else:
-            self.host,self.port=split_endpoint(endpoint)
-            self.jsonrpc_client = JSONRPCClient(
+            self.host, self.port = split_endpoint(endpoint)
+            self.jsonrpc_client_without_sender = JSONRPCClient(
                 self.host,
                 self.port,
                 '',
             )
-            if not check_json_rpc(self.jsonrpc_client):
+            if not check_json_rpc(self.jsonrpc_client_without_sender):
                 raise RuntimeError('BlockChainProxy connect eth-client fail.')
 
-    def get_jsonrpc_client(self, sender, password=None):
-        if self.jsonrpc_proxy.get(sender) == None:
+    def get_jsonrpc_client_with_sender(self, sender, password=None):
+        if sender == None:
+            return None
+        if self.jsonrpc_proxys.get(sender) == None:
             private_key = self.account_manager.get_account(sender,password).privkey
 
             if len(hexlify(private_key)) != 64:
                 private_key = decode_hex(private_key)
 
-            if self.endpoint == None:
-                self.jsonrpc_proxy[sender] = JSONRPCClient(
+            if self.third_party_endpoint == None:
+                self.jsonrpc_proxys[sender] = JSONRPCClient(
                     host = self.host,
                     port = self.port,
                     privkey = private_key,
                 )
             else:
-                self.jsonrpc_proxy[sender] = JSONRPCClient_for_infura(
-                    self.endpoint,
+                self.jsonrpc_proxys[sender] = JSONRPCClient_for_infura(
+                    self.third_party_endpoint,
                     privkey = private_key,
                 )
-        return self.jsonrpc_proxy[sender]
+        return self.jsonrpc_proxys[sender]
 
-    """获取本合约管理服务维护的和合约代理"""
-    def get_contract_proxy(self, attacher,contract_name,password=None,readonly=False):
-        if readonly:
-            client = self.jsonrpc_client
-        else:
-            client = self.get_jsonrpc_client(attacher,password)
-
-        assert client != None
-        
-        contract_owner = self.contract_owner_proxy.get(contract_name)
-        if contract_owner == None:
-            log.info("Not found contract proxy. deploy contract {} first.".format(contract_name))
-            return None
-
-        if contract_owner == attacher:
-            return contract_owner
-        
-        contract_proxy = client.new_contract_proxy(
-            contract_name,
-            contract_owner.abi,
-            contract_owner.address,
-        )
-        assert contract_proxy != None
-        return contract_proxy
-
-    """给通过第三方服务部署的合约关联一个合约代理"""
     def attach_contract(self, 
-            attacher, contract_address, contract_file, contract_name,
-            password=None):
-
-        client = self.get_jsonrpc_client(attacher,password)
-        if client == None:
-            return
-
-        deployed_code = client.eth_getCode(contract_address)
-        if deployed_code == '0x':
-            raise RuntimeError('Contract address has no code. deploy contract first.')
-        contract_path=get_contract_path(contract_file)
-        all_contracts = compile_file(contract_path, libraries=dict())
-        if contract_name in all_contracts:
-            contract_key = contract_name
-
-        elif contract_path is not None:
-            _, filename = os.path.split(contract_path)
-            contract_key = filename + ':' + contract_name
-
-            if contract_key not in all_contracts:
-                raise ValueError('Unknown contract {}'.format(contract_name))
+            contract_name,contract_file=None, contract_address=None,
+            attacher=None,password=None):
+        if attacher != None:
+            client = self.get_jsonrpc_client_with_sender(attacher,password)
         else:
-            raise ValueError(
-                'Unknown contract {} and no contract_path given'.format(contract_name)
-            )
+            client = self.jsonrpc_client_without_sender
+        
+        assert client != None
+
+        """传入合约地址为空，检查是否为本代理部署的合约"""
+        if contract_address == None:
+            contract_owner = self.contract_proxy_with_owner.get(contract_name)
+            if contract_owner == None:
+                log.info("Not found contract proxy. deploy contract {} first.".format(contract_name))
+                return None
+
+            if contract_owner.sender == attacher:
+                return contract_owner
+            
+            contract_address = contract_owner.address
+            abi = contract_owner.abi
+        else:
+            deployed_code = client.eth_getCode(contract_address)
+            if deployed_code == '0x':
+                raise RuntimeError('Contract address has no code. deploy contract first.')
+
+            """编译合约"""
+            contract_path=get_contract_path(contract_file)
+            all_contracts = compile_file(contract_path, libraries=dict())
+            if contract_name in all_contracts:
+                contract_key = contract_name
+
+            elif contract_path is not None:
+                _, filename = os.path.split(contract_path)
+                contract_key = filename + ':' + contract_name
+
+                if contract_key not in all_contracts:
+                    raise ValueError('Unknown contract {}'.format(contract_name))
+            else:
+                raise ValueError('Unknown contract {} and no contract_path given'.format(contract_name))
+            abi = all_contracts[contract_key]['abi']
+
         return client.new_contract_proxy(
             contract_name,
-            all_contracts[contract_key]['abi'],
+            abi,
             contract_address,
         )
     
@@ -269,10 +266,11 @@ class BlockChainProxy(object):
     def check_transaction_threw(self,transaction_hash):
         """Check if the transaction threw or if it executed properly"""
         encoded_transaction = data_encoder(transaction_hash.decode('hex'))
-        transaction = self.jsonrpc_client.call('eth_getTransactionByHash', encoded_transaction)
-        receipt = self.jsonrpc_client.call('eth_getTransactionReceipt', encoded_transaction)
+        transaction = self.jsonrpc_client_without_sender.call('eth_getTransactionByHash', encoded_transaction)
+        receipt = self.jsonrpc_client_without_sender.call('eth_getTransactionReceipt', encoded_transaction)
         return int(transaction['gas'], 0) == int(receipt['gasUsed'], 0)
 
+    """查询交易执行结果，并监听合约事件"""
     def poll_contarct_transaction_result(self,
         transaction_hash,
         fromBlock=0,
@@ -281,16 +279,18 @@ class BlockChainProxy(object):
 
         event_key=None
         event=None
-        self.jsonrpc_client.poll(
+        """等待交易被打包进入区块"""
+        self.jsonrpc_client_without_sender.poll(
             unhexlify(transaction_hash),
             timeout=constant.DEFAULT_POLL_TIMEOUT,
         )
-        
+        """检查交易是否失败"""
         fail = self.check_transaction_threw(transaction_hash)
         if fail:
             log.info('transaction({}) execute failed .'.format(transaction_hash))
             return event_key, event
 
+        """如果指定监听合约事件，过滤该合约事件"""
         if event_name != None and contract_proxy != None:
             event_key,event = contract_proxy.poll_contract_event(
                 fromBlock,
@@ -298,13 +298,14 @@ class BlockChainProxy(object):
                 event_name,
                 *event_filter_args)
         return event_key, event    
-        
+
+    """部署合约"""    
     def deploy_contract(self, 
         sender, contract_file, contract_name,
         constructor_parameters=tuple(),
         password=None):
 
-        client = self.get_jsonrpc_client(sender,password)
+        client = self.get_jsonrpc_client_with_sender(sender,password)
         if client == None:
             return
 
@@ -324,13 +325,12 @@ class BlockChainProxy(object):
             timeout=constant.DEFAULT_POLL_TIMEOUT,
         )
         log.info('deploying contract: [{}] ok. address: {} .'.format(contract_name,hexlify(contract_proxy.address)))
-        self.contract_owner_proxy[contract_name] = contract_proxy
+        self.contract_proxy_with_owner[contract_name] = contract_proxy
         return contract_proxy
 
-
-    def transfer_eth(self, sender, to, eth_amount,password=None):
+    def transfer_currency(self, sender, to, eth_amount,password=None):
         
-        client = self.get_jsonrpc_client(sender,password)
+        client = self.get_jsonrpc_client_with_sender(sender,password)
         if client == None:
             return
 
@@ -356,7 +356,7 @@ class BlockChainProxy(object):
         Return:
             average block time (int) in seconds
         """
-        last_block_number = self.jsonrpc_client.block_number()
+        last_block_number = self.jsonrpc_client_without_sender.block_number()
         # around genesis block there is nothing to estimate
         if last_block_number < 1:
             return 15
@@ -366,28 +366,28 @@ class BlockChainProxy(object):
         else:
             interval = last_block_number - oldest
         assert interval > 0
-        last_timestamp = int(self.jsonrpc_client.get_block_header(last_block_number)['timestamp'], 16)
-        first_timestamp = int(self.jsonrpc_client.get_block_header(last_block_number - interval)['timestamp'], 16)
+        last_timestamp = int(self.jsonrpc_client_without_sender.get_block_header(last_block_number)['timestamp'], 16)
+        first_timestamp = int(self.jsonrpc_client_without_sender.get_block_header(last_block_number - interval)['timestamp'], 16)
         delta = last_timestamp - first_timestamp
         return float(delta) / interval
 
     def block_number(self):
         """ Return the most recent block. """
-        return quantity_decoder(self.jsonrpc_client.call('eth_blockNumber'))
+        return quantity_decoder(self.jsonrpc_client_without_sender.call('eth_blockNumber'))
 
     def next_block(self):
-        target_block_number = self.jsonrpc_client.block_number() + 1
+        target_block_number = self.jsonrpc_client_without_sender.block_number() + 1
         current_block = target_block_number
 
         while not current_block >= target_block_number:
-            current_block = self.jsonrpc_client.block_number()
+            current_block = self.jsonrpc_client_without_sender.block_number()
             gevent.sleep(0.5)
 
         return current_block
 
     def balance(self, account):
         """ Return the balance of the account of given address. """
-        res = self.jsonrpc_client.call('eth_getBalance', address_encoder(account), 'latest')
+        res = self.jsonrpc_client_without_sender.call('eth_getBalance', address_encoder(account), 'latest')
         return quantity_decoder(res)
 
 class JSONRPCClient(object):
@@ -712,13 +712,10 @@ class JSONRPCClient(object):
                         decoded_event['transaction_hash'] = data_encoder(match_log.get('transactionHash'))
                         if not condition or condition(decoded_event):
                             result.append(decoded_event)
-                        
-                #self.call('eth_uninstallFilter',quantity_encoder(fid))
                 if result !=[]:
                     return result 
             if i < timeout:
                 gevent.sleep(wait)
-        #self.call('eth_uninstallFilter',quantity_encoder(fid))
         return list()
 
     @check_node_connection
