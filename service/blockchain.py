@@ -167,7 +167,7 @@ class BlockChainProxy(object):
             keystore_path):
             
         self.chain_name = chain_name
-        self.contract_proxy_with_owner =  dict()
+        self.local_contract_proxys =  dict()
         self.jsonrpc_proxys =  dict()
         self.account_manager = accounts_manager.AccountManager(keystore_path)
         self.third_party_endpoint = None
@@ -223,19 +223,19 @@ class BlockChainProxy(object):
         
         assert client != None
 
-        """传入合约地址为空，检查是否为本代理部署的合约"""
-        if contract_address == None:
-            contract_owner = self.contract_proxy_with_owner.get(contract_name)
-            if contract_owner == None:
-                log.info("Not found contract proxy. deploy contract {} first.".format(contract_name))
-                return None
+        """检查是否为本代理部署的合约"""
+        contract_local = self.local_contract_proxys.get(contract_name)
+        if contract_local != None:
+            if contract_local.sender == attacher: #是本地部署的合约，如果部署这是attacher，直接返回搞proxy
+                return contract_local
+            if contract_address != None and contract_address != contract_local.address: #是本地部署的合约，但合约地址不匹配
+                raise ValueError('Contract address has no match. deploy lastest contract first.')
+            #是本地部署的合约，但没有指定合约地址，则从proxy中获取
+            contract_address = contract_local.address
+            abi = contract_local.abi
 
-            if contract_owner.sender == attacher:
-                return contract_owner
-            
-            contract_address = contract_owner.address
-            abi = contract_owner.abi
-        else:
+        """非本代理部署的合约，但是指定了合约地址，编译该合约获取abi,并关联到合约地址"""
+        elif contract_address != None:
             deployed_code = client.eth_getCode(contract_address)
             if deployed_code == '0x':
                 raise RuntimeError('Contract address has no code. deploy contract first.')
@@ -256,6 +256,10 @@ class BlockChainProxy(object):
                 raise ValueError('Unknown contract {} and no contract_path given'.format(contract_name))
             abi = all_contracts[contract_key]['abi']
 
+        """非本代理部署的合约，但是没指定合约地址"""
+        else:
+            raise ValueError('{} is not deployed in local and contract address is nil. deploy contract first.'.format(contract_name))
+        
         return client.new_contract_proxy(
             contract_name,
             abi,
@@ -294,7 +298,6 @@ class BlockChainProxy(object):
         if event_name != None and contract_proxy != None:
             event_key,event = contract_proxy.poll_contract_event(
                 fromBlock,
-                contract_proxy.contract_name,
                 event_name,
                 *event_filter_args)
         return event_key, event    
@@ -325,7 +328,7 @@ class BlockChainProxy(object):
             timeout=constant.DEFAULT_POLL_TIMEOUT,
         )
         log.info('deploying contract: [{}] ok. address: {} .'.format(contract_name,hexlify(contract_proxy.address)))
-        self.contract_proxy_with_owner[contract_name] = contract_proxy
+        self.local_contract_proxys[contract_name] = contract_proxy
         return contract_proxy
 
     def transfer_currency(self, sender, to, eth_amount,password=None):

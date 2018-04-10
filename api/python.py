@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import pymysql
 from ethereum.utils import normalize_address
 from binascii import hexlify, unhexlify
 from service.utils import (
@@ -103,30 +104,202 @@ class PYETHAPI(object):
 
         _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Transfer',to)
 
-class POLLING_EVENTS(object):
-    def __init__(
-            self
-            ):
-        self.polling_events = dict()
-        self.is_stopped = false
-        self.polling_delay = 3
+class DBService(object):
+
+    def __init__(self):
+        self.db = None
+        self.polling_events_callback = dict()
+        self.polling_events_callback['ethereum_Token_Transfer'] = self.ethereum_Token_Transfer_to_DB
+        self.polling_events_callback['atmchain_foreignBridge_Deposit'] = self.atmchain_foreignBridge_Deposit_to_DB
+
         
+    def ethereum_Token_Transfer_to_DB(self, sql_sets, tx_hash, *args,is_offline=false):
+        
+        """检查数据库bridge中是否存在DEPOSIT表， 如果不存在，新建该表"""
+        if !db.is_table_exist('DEPOSIT', 'bridge'):
+            self.create_table('DEPOSIT', '...')
+
+        """检查tx_hash对应记录数据是否存在"""
+        if is_offline == true :
+            sql = sql_sets[0](*args)
+
+        result = self.find_rows('DEPOSIT',"transaction_hash = {}".format(tx_hash))
+        if !result:
+            sql = sql_sets[2](*args)
+        else:
+            sql = sql_sets[1](*args)
+  
+        self.insert_into_sql([sql])
+
+    def atmchain_foreignBridge_Deposit_to_DB(self, sql_sets, tx_hash, *args):
+        
+        """检查数据库bridge中是否存在DEPOSIT表， 如果不存在，新建该表"""
+        if !db.is_table_exist('DEPOSIT', 'bridge'):
+            return
+
+        sql = sql_sets[0](*args)
+
+        self.insert_into_sql([sql])
+
+    def connect(self):
+        self.db = pymysql.connect(
+            host=ip, 
+            port=port, 
+            user=mysql_user, 
+            passwd=mysql_passwd, 
+            db=database, 
+            )
+  
+    def disconnect(self):
+        self.db.close()
+        
+    def create_table(self, tablename, columns):
+        type_data = ['int', 'double(10,3)']
+        cursor = self.db.cursor()
+        sql="create table %s("%(tablename,)
+        sql+=columns+')'
+        try:
+            cursor.execute(sql)
+            print("Table %s is created"%tablename)
+        except:
+            self.db.rollback()
+
+     def is_table_exist(self, tablename,dbname):
+        cursor=self.db.cursor()
+        sql="select table_name from information_schema.TABLES where table_schema='%s' and table_name = '%s'"%(dbname,tablename)
+
+        try:
+            cursor.execute(sql)
+            results = cursor.fetchall() #接受全部返回行
+        except:
+            #不存在这张表返回错误提示
+            raise Exception('This table does not exist')
+        if not results:
+            return None
+        else:
+            return results
+
+    """datas = {(key: value),.....}"""
+    def insert_mysql_with_json(self, tablename, datas):
+        keys = datas[0].keys()
+        keys = str(tuple(keys))
+        keys = ''.join(keys.split("'")) # 用' 隔开
+        print(keys)
+        ret = []
+        for dt in datas:
+            values = dt.values() ##  ‘str' object has no attribute#
+            sql = "insert into %s" % tablename + keys
+            sql = sql + " values" + str(tuple(values))
+            ret.append(sql)
+        self.insert_into_sql(ret)
+
+    def insert_into_sql(self,sqls):
+        cursor = self.db.cursor()
+        for sql in sqls:
+            # 执行sql语句
+            try:
+                cursor.execute(sql)
+                self.db.commit()
+            except:
+                self.db.rollback()
+    
+    """找列名"""
+    def find_columns(self, tablename):
+        sql = "select COLUMN_NAME from information_schema.columns where table_name='%s'" % tablename
+        cursor = self.db.cursor()
+        try:
+            cursor.execute(sql)
+            results = cursor.fetchall()
+        except:
+            raise Exception('find columns fail.')
+        return tuple(map(lambda x: x[0], results))
+ 
+    def find_rows(self, tablename, condition, fieldName=None):
+        """
+        :param tablename: test_scale1015
+        :param condition: transaction_hash = '.....'
+        :param fieldName: None or (columns1010, columns1011, columns1012, columns1013, time)
+        :return:
+        """
+        cursor = self.db.cursor()
+        sql = ''
+        if fieldName==None:
+            fieldName = self.find_columns(tablename)
+            sql = "select * from %s where %s" % (tablename, condition)
+        else:
+            fieldNameStr = ','.join(fieldName)
+            sql = "select %s from %s where %s" % (fieldNameStr, tablename, condition)
+   
+        try:
+            cursor.execute(sql)
+            results = cursor.fetchall()
+        except:
+            raise Exception('find fail.')
+        return results
+
+
+class POLLING_EVENTS(object):
+    def __init__(self):
+        self.polling_events = dict()
+        self.polling_events_chain_proxy_cache = dict()
+        self.polling_events_contract_proxy_cache = dict()
+
+        self.polling_delay = 3
+        self.polled_blocknumber = 0
+        self.is_stopped = false
+        self.DBService = DBService()
+
+    def update_polling_event(self):
+        reload(custom_contract_events)
+        for key in custom_contract_events.__pollingEventSet__ : 
+            chain_name,contract_name,event_name = key.split(':')[:3]
+
+            self.polling_events[chain_name][contract_name][event_name]["filter_args"] = 
+                custom_contract_events.__pollingEventSet__[key]['filter_args']
+
+            if self.polling_events_chain_proxy_cache.get(chain_name) == None:
+                self.polling_events_chain_proxy_cache[chain_name] = self._get_chain_proxy(chain_name)
+
+            key = chain_name + '_' + contract_name
+            if self.polling_events_contract_proxy_cache.get(key) == None:
+                self.polling_events_contract_proxy_cache[key] = 
+                    self.polling_events_chain_proxy_cache[chain_name].attach_contract(contract_name)
+
+    
     def run(self,chain_name):
         _proxy = self._get_chain_proxy(chain_name)
-        print('satrt monitor retweet...')
+        print('[CHAIN {}]satrt polling contract event...'.format(chain_name))
+
         while not self.is_stopped:
+            self.update_polling_event()
             gevent.sleep(self.polling_delay)
-            
-            ATMToken_contract_proxy = ethereum_proxy.attach_contract('ATMToken')
+            print('[CHAIN {}]tick.'.format(chain_name))
+            if chain_name in polling_events.keys() : 
 
-            block_number = ethereum_proxy.block_number()
-            txhash = ATMToken_contract_proxy.transfer(
-                _to,lock_amount*constant.ATM_DECIMALS)
+                contarct_proxy = self.polling_events_chain_proxy_cache.get(chain_name)
+                polling_current_blocknumber = contarct_proxy.block_number()
 
-            ethereum_proxy.poll_contarct_transaction_result(
-                txhash,block_number,ATMToken_contract_proxy,'Transfer',_to)
+                for contract_name in polling_events[chain_name] :
+                    for event_name in polling_events[chain_name][contract_name] :
+                        
+                        contract_proxy = self.polling_events_contract_proxy_cache.get(chain_name + '_' + contract_name)
 
-        
+                        event_key, event = contract_proxy.poll_contract_event(
+                            self.polled_blocknumber,
+                            event_name,
+                            polling_events[chain_name][contract_name][event_name]["filter_args"],
+                            timeout = 0,
+                            need_reload=false
+                        )
+                        DBcallback = self.DBService.polling_events_callback[chain_name + '_' + contract_name + '_' + event_name]
+                        sql_sets = custom_contract_events.__pollingEventSet__[key]['stage']
+                        DBcallback(sql_sets,2,event['transaction_hash'],(event))
+                        
+                self.polled_blocknumber = polling_current_blocknumber
+
+    def stop(self):
+        self.is_stopped = true
+
 class PYETHAPI_ATMCHAIN(PYETHAPI):
     
     polling_events = POLLING_EVENTS()
@@ -143,11 +316,6 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
             chain_name
         ) 
         return _proxy
-
-    def register_polling_event(self, chain_name, contract_name, event_name, *args):
-        polling_events.polling_events[chain_name] = {
-            contract_name+'_'+event_name : [0, contract_name, event_name, *args]
-        }
 
     def ATM_accounts_list(self): 
         contract_Addresses=dict()

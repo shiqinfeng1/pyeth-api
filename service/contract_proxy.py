@@ -48,20 +48,23 @@ class ContractProxy(object):
             )
             setattr(self, function_name, function_proxy)
     
-    def poll_contract_event(self, fromBlock,contract_name,event_name,*args):
+    def poll_contract_event(self, fromBlock,event_name,*args,timeout=constant.DEFAULT_TIMEOUT, need_reload=true):
         """
         reload custom_contract_events module to get latest custom event filters
         """
-        reload(custom_contract_events)
+        if need_reload:
+            reload(custom_contract_events)
+            
         event = list()
-        event_key = contract_name+'_'+event_name
+        event_key = self.contract_name+'_'+event_name
         if event_key in custom_contract_events.__conditionSet__.keys(): 
             condition = custom_contract_events.__conditionSet__[event_key]
             event = self.jsonrpc_client.poll_contract_events(
                 self.address,
                 self.translator,
                 fromBlock,
-                condition(*args)
+                condition(*args),
+                timeout = timeout
                 )
             log.info('Polled event(with filter {}): {}'.format(event_key,event))
         else:
