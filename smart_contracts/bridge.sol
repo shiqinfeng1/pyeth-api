@@ -357,7 +357,7 @@ contract ForeignBridge {
             DepositConfirmation(recipient, value, transactionHash);
             return;
         }
-        recipient.transfer(value * (10**8))
+        recipient.transfer(value * (10**8));
         Deposit(recipient, value * (10**8), transactionHash);
     }
 
@@ -371,11 +371,9 @@ contract ForeignBridge {
     /// an authority will pick up `CollectedSignatures` an call `HomeBridge.withdraw`
     /// which transfers `value - relayCost` to `recipient` completing the transfer.
     function transferHomeViaRelay(address recipient, uint256 value) public {
-        require(balances[msg.sender] >= value);
+        // require(balances[msg.sender] >= value);
         // don't allow 0 value transfers to home
         require(value > 0);
-
-        require(value > estimatedWeiCostOfWithdraw);
 
     }
 
