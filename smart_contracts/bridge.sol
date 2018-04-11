@@ -1,11 +1,11 @@
-pragma solidity ^0.4.17;
+pragma solidity ^0.4.15;
 
 
 /// general helpers.
 /// `internal` so they get compiled into contracts using them.
 library Helpers {
     /// returns whether `array` contains `value`.
-    function addressArrayContains(address[] array, address value) internal pure returns (bool) {
+    function addressArrayContains(address[] array, address value) internal returns (bool) {
         for (uint256 i = 0; i < array.length; i++) {
             if (array[i] == value) {
                 return true;
@@ -16,7 +16,7 @@ library Helpers {
 
     // returns the digits of `inputValue` as a string.
     // example: `uintToString(12345678)` returns `"12345678"`
-    function uintToString(uint256 inputValue) internal pure returns (string) {
+    function uintToString(uint256 inputValue) internal   returns (string) {
         // figure out the length of the resulting string
         uint256 length = 0;
         uint256 currentValue = inputValue;
@@ -40,7 +40,7 @@ library Helpers {
     /// contain `requiredSignatures` distinct correct signatures
     /// where signer is in `allowed_signers`
     /// that signed `message`
-    function hasEnoughValidSignatures(bytes message, uint8[] vs, bytes32[] rs, bytes32[] ss, address[] allowed_signers, uint256 requiredSignatures) internal pure returns (bool) {
+    function hasEnoughValidSignatures(bytes message, uint8[] vs, bytes32[] rs, bytes32[] ss, address[] allowed_signers, uint256 requiredSignatures) internal   returns (bool) {
         // not enough signatures
         if (vs.length < requiredSignatures) {
             return false;
@@ -66,27 +66,10 @@ library Helpers {
 
 }
 
-
-/// Library used only to test Helpers library via rpc calls
-library HelpersTest {
-    function addressArrayContains(address[] array, address value) public pure returns (bool) {
-        return Helpers.addressArrayContains(array, value);
-    }
-
-    function uintToString(uint256 inputValue) public pure returns (string str) {
-        return Helpers.uintToString(inputValue);
-    }
-
-    function hasEnoughValidSignatures(bytes message, uint8[] vs, bytes32[] rs, bytes32[] ss, address[] addresses, uint256 requiredSignatures) public pure returns (bool) {
-        return Helpers.hasEnoughValidSignatures(message, vs, rs, ss, addresses, requiredSignatures);
-    }
-}
-
-
 // helpers for message signing.
 // `internal` so they get compiled into contracts using them.
 library MessageSigning {
-    function recoverAddressFromSignedMessage(bytes signature, bytes message) internal pure returns (address) {
+    function recoverAddressFromSignedMessage(bytes signature, bytes message) internal   returns (address) {
         require(signature.length == 65);
         bytes32 r;
         bytes32 s;
@@ -100,20 +83,11 @@ library MessageSigning {
         return ecrecover(hashMessage(message), uint8(v), r, s);
     }
 
-    function hashMessage(bytes message) internal pure returns (bytes32) {
+    function hashMessage(bytes message) internal   returns (bytes32) {
         bytes memory prefix = "\x19Ethereum Signed Message:\n";
         return keccak256(prefix, Helpers.uintToString(message.length), message);
     }
 }
-
-
-/// Library used only to test MessageSigning library via rpc calls
-library MessageSigningTest {
-    function recoverAddressFromSignedMessage(bytes signature, bytes message) public pure returns (address) {
-        return MessageSigning.recoverAddressFromSignedMessage(signature, message);
-    }
-}
-
 
 library Message {
     // layout of message :: bytes:
@@ -134,7 +108,7 @@ library Message {
     // for more details see discussion in:
     // https://github.com/paritytech/parity-bridge/issues/61
 
-    function getRecipient(bytes message) internal pure returns (address) {
+    function getRecipient(bytes message) internal   returns (address) {
         address recipient;
         // solium-disable-next-line security/no-inline-assembly
         assembly {
@@ -143,7 +117,7 @@ library Message {
         return recipient;
     }
 
-    function getValue(bytes message) internal pure returns (uint256) {
+    function getValue(bytes message) internal   returns (uint256) {
         uint256 value;
         // solium-disable-next-line security/no-inline-assembly
         assembly {
@@ -152,7 +126,7 @@ library Message {
         return value;
     }
 
-    function getTransactionHash(bytes message) internal pure returns (bytes32) {
+    function getTransactionHash(bytes message) internal   returns (bytes32) {
         bytes32 hash;
         // solium-disable-next-line security/no-inline-assembly
         assembly {
@@ -161,7 +135,7 @@ library Message {
         return hash;
     }
 
-    function getHomeGasPrice(bytes message) internal pure returns (uint256) {
+    function getHomeGasPrice(bytes message) internal   returns (uint256) {
         uint256 gasPrice;
         // solium-disable-next-line security/no-inline-assembly
         assembly {
@@ -174,19 +148,19 @@ library Message {
 
 /// Library used only to test Message library via rpc calls
 library MessageTest {
-    function getRecipient(bytes message) public pure returns (address) {
+    function getRecipient(bytes message) public   returns (address) {
         return Message.getRecipient(message);
     }
 
-    function getValue(bytes message) public pure returns (uint256) {
+    function getValue(bytes message) public   returns (uint256) {
         return Message.getValue(message);
     }
 
-    function getTransactionHash(bytes message) public pure returns (bytes32) {
+    function getTransactionHash(bytes message) public   returns (bytes32) {
         return Message.getTransactionHash(message);
     }
 
-    function getHomeGasPrice(bytes message) public pure returns (uint256) {
+    function getHomeGasPrice(bytes message) public   returns (uint256) {
         return Message.getHomeGasPrice(message);
     }
 }
@@ -311,82 +285,6 @@ contract HomeBridge {
 
 
 contract ForeignBridge {
-    // following is the part of ForeignBridge that implements an ERC20 token.
-    // ERC20 spec: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-20.md
-
-    uint256 public totalSupply;
-
-    string public name = "ForeignBridge";
-    // BETH = bridged ether
-    string public symbol = "BETH";
-    // 1-1 mapping of ether to tokens
-    uint8 public decimals = 18;
-
-    /// maps addresses to their token balances
-    mapping (address => uint256) public balances;
-
-    // owner of account approves the transfer of an amount by another account
-    mapping(address => mapping (address => uint256)) allowed;
-
-    /// Event created on money transfer
-    event Transfer(address indexed from, address indexed to, uint256 tokens);
-
-    // returns the ERC20 token balance of the given address
-    function balanceOf(address tokenOwner) public view returns (uint256) {
-        return balances[tokenOwner];
-    }
-
-    /// Transfer `value` to `recipient` on this `foreign` chain.
-    ///
-    /// does not affect `home` chain. does not do a relay.
-    /// as specificed in ERC20 this doesn't fail if tokens == 0.
-    function transfer(address recipient, uint256 tokens) public returns (bool) {
-        require(balances[msg.sender] >= tokens);
-        // fails if there is an overflow
-        require(balances[recipient] + tokens >= balances[recipient]);
-
-        balances[msg.sender] -= tokens;
-        balances[recipient] += tokens;
-        Transfer(msg.sender, recipient, tokens);
-        return true;
-    }
-
-    // following is the part of ForeignBridge that is concerned
-    // with the part of the ERC20 standard responsible for giving others spending rights
-    // and spending others tokens
-
-    // created when `approve` is executed to mark that
-    // `tokenOwner` has approved `spender` to spend `tokens` of his tokens
-    event Approval(address indexed tokenOwner, address indexed spender, uint256 tokens);
-
-    // allow `spender` to withdraw from your account, multiple times, up to the `tokens` amount.
-    // calling this function repeatedly overwrites the current allowance.
-    function approve(address spender, uint256 tokens) public returns (bool) {
-        allowed[msg.sender][spender] = tokens;
-        Approval(msg.sender, spender, tokens);
-        return true;
-    }
-
-    // returns how much `spender` is allowed to spend of `owner`s tokens
-    function allowance(address owner, address spender) public view returns (uint256) {
-        return allowed[owner][spender];
-    }
-
-    function transferFrom(address from, address to, uint tokens) public returns (bool) {
-        // `from` has enough tokens
-        require(balances[from] >= tokens);
-        // `sender` is allowed to move `tokens` from `from`
-        require(allowed[from][msg.sender] >= tokens);
-        // fails if there is an overflow
-        require(balances[to] + tokens >= balances[to]);
-
-        balances[to] += tokens;
-        balances[from] -= tokens;
-        allowed[from][msg.sender] -= tokens;
-
-        Transfer(from, to, tokens);
-        return true;
-    }
 
     // following is the part of ForeignBridge that is
     // no longer part of ERC20 and is concerned with
@@ -401,54 +299,44 @@ contract ForeignBridge {
         bytes[] signatures;
     }
 
-    /// Number of authorities signatures required to withdraw the money.
-    ///
-    /// Must be less than number of authorities.
     uint256 public requiredSignatures;
-
-    uint256 public estimatedGasCostOfWithdraw;
-
-    /// Contract authorities.
     address[] public authorities;
-
-    /// Pending deposits and authorities who confirmed them
     mapping (bytes32 => address[]) deposits;
-
-    /// Pending signatures and authorities who confirmed them
     mapping (bytes32 => SignaturesCollection) signatures;
 
     /// triggered when an authority confirms a deposit
     event DepositConfirmation(address recipient, uint256 value, bytes32 transactionHash);
-
-    /// triggered when enough authorities have confirmed a deposit
     event Deposit(address recipient, uint256 value, bytes32 transactionHash);
-
-    /// Event created on money withdraw.
     event Withdraw(address recipient, uint256 value, uint256 homeGasPrice);
-
     event WithdrawSignatureSubmitted(bytes32 messageHash);
-
-    /// Collected signatures which should be relayed to home chain.
     event CollectedSignatures(address authorityResponsibleForRelay, bytes32 messageHash);
 
     function ForeignBridge(
         uint256 _requiredSignatures,
-        address[] _authorities,
-        uint256 _estimatedGasCostOfWithdraw
+        address[] _authorities
     ) public
     {
         require(_requiredSignatures != 0);
         require(_requiredSignatures <= _authorities.length);
         requiredSignatures = _requiredSignatures;
         authorities = _authorities;
-        estimatedGasCostOfWithdraw = _estimatedGasCostOfWithdraw;
+    }
+
+    function addressArrayContains(address[] array, address value) internal returns (bool) {
+        for (uint256 i = 0; i < array.length; i++) {
+            if (array[i] == value) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /// require that sender is an authority
     modifier onlyAuthority() {
-        require(Helpers.addressArrayContains(authorities, msg.sender));
+        require(addressArrayContains(authorities, msg.sender));
         _;
     }
+
 
     /// Used to deposit money to the contract.
     ///
@@ -460,7 +348,7 @@ contract ForeignBridge {
         var hash = keccak256(recipient, value, transactionHash);
 
         // don't allow authority to confirm deposit twice
-        require(!Helpers.addressArrayContains(deposits[hash], msg.sender));
+        require(!addressArrayContains(deposits[hash], msg.sender));
 
         deposits[hash].push(msg.sender);
 
@@ -469,15 +357,8 @@ contract ForeignBridge {
             DepositConfirmation(recipient, value, transactionHash);
             return;
         }
-
-        balances[recipient] += value;
-        // mints tokens
-        totalSupply += value;
-        // ERC20 specifies: a token contract which creates new tokens
-        // SHOULD trigger a Transfer event with the _from address
-        // set to 0x0 when tokens are created.
-        Transfer(0x0, recipient, value);
-        Deposit(recipient, value, transactionHash);
+        recipient.transfer(value * (10**8))
+        Deposit(recipient, value * (10**8), transactionHash);
     }
 
     /// Transfer `value` from `msg.sender`s local balance (on `foreign` chain) to `recipient` on `home` chain.
@@ -489,22 +370,13 @@ contract ForeignBridge {
     /// once `requiredSignatures` are collected a `CollectedSignatures` event will be emitted.
     /// an authority will pick up `CollectedSignatures` an call `HomeBridge.withdraw`
     /// which transfers `value - relayCost` to `recipient` completing the transfer.
-    function transferHomeViaRelay(address recipient, uint256 value, uint256 homeGasPrice) public {
+    function transferHomeViaRelay(address recipient, uint256 value) public {
         require(balances[msg.sender] >= value);
         // don't allow 0 value transfers to home
         require(value > 0);
 
-        uint256 estimatedWeiCostOfWithdraw = estimatedGasCostOfWithdraw * homeGasPrice;
         require(value > estimatedWeiCostOfWithdraw);
 
-        balances[msg.sender] -= value;
-        // burns tokens
-        totalSupply -= value;
-        // in line with the transfer event from `0x0` on token creation
-        // recommended by ERC20 (see implementation of `deposit` above)
-        // we trigger a Transfer event to `0x0` on token destruction
-        Transfer(msg.sender, 0x0, value);
-        Withdraw(recipient, value, homeGasPrice);
     }
 
     /// Should be used as sync tool
@@ -523,7 +395,7 @@ contract ForeignBridge {
         var hash = keccak256(message);
 
         // each authority can only provide one signature per message
-        require(!Helpers.addressArrayContains(signatures[hash].signed, msg.sender));
+        require(!addressArrayContains(signatures[hash].signed, msg.sender));
         signatures[hash].message = message;
         signatures[hash].signed.push(msg.sender);
         signatures[hash].signatures.push(signature);
@@ -537,12 +409,12 @@ contract ForeignBridge {
     }
 
     /// Get signature
-    function signature(bytes32 hash, uint256 index) public view returns (bytes) {
+    function signature(bytes32 hash, uint256 index) public   returns (bytes) {
         return signatures[hash].signatures[index];
     }
 
     /// Get message
-    function message(bytes32 hash) public view returns (bytes) {
+    function message(bytes32 hash) public   returns (bytes) {
         return signatures[hash].message;
     }
 }

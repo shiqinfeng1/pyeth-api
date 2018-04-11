@@ -272,7 +272,7 @@ class AccountManager(object):
         assert len(address) == 42 and address[:2]=='0x'
         
         password = getpass.getpass('Enter the password to unlock %s: ' % old_address)
-        acc = Account.load(path,password)
+        acc = Account.load(self.keystore_path,password)
         if acc.locked == False:
             self.admin_account = address
             acc.lock()

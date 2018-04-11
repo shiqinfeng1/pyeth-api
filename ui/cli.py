@@ -1,5 +1,7 @@
 import click
 import os
+import sys
+import getpass
 import gevent
 import gevent.monkey
 import signal
@@ -141,6 +143,10 @@ def run(ctx, **kwargs):
         print('Welcome to pyeth-api-server!')
         slogging.configure(':DEBUG')
         blockchain_proxy = ctx.invoke(app, **kwargs)
+
+        if pyeth_api == None:
+            pyeth_api = _get_pyeth_api(kwargs['inst'],blockchain_proxy)
+
         domain_list = ['*']
         if kwargs['rpccorsdomain']:
             if ',' in kwargs['rpccorsdomain']:
@@ -149,8 +155,6 @@ def run(ctx, **kwargs):
             else:
                 domain_list.append(str(kwargs['rpccorsdomain']))
         if ctx.params['rpc']:
-            if pyeth_api == None:
-                pyeth_api = _get_pyeth_api(kwargs['inst'],blockchain_proxy)
             rest_api = RestAPI(pyeth_api)
             api_server = APIServer(
                 rest_api,
@@ -171,16 +175,31 @@ def run(ctx, **kwargs):
                 )
             )
 
-        if ctx.params['console']:
-            if pyeth_api == None:
-                pyeth_api = _get_pyeth_api(kwargs['inst'],blockchain_proxy)
+        """=======end============="""
+        proxy1 = pyeth_api.new_blockchain_proxy("ethereum","localhost:21024",os.getcwd()+'/'+sys.argv[0]+'/keystore')
+        proxy2 = pyeth_api.new_blockchain_proxy("atmchain","localhost:21024",os.getcwd()+'/'+sys.argv[0]+'/keystore')
+        
+        account = "0x5252781539b365e08015fa7ed77af5a36097f39d"
+        password = getpass.getpass('Enter the password to unlock %s: ' % account)
+        ATMToken_proxy = proxy1.deploy_contract( 
+            account,
+            'ATMToken.sol', 'ATMToken',
+            password=password
+            )
+        ATMToken_proxy = proxy2.deploy_contract( 
+            account,
+            'bridge.sol', 'ForeignBridge',
+            (1,[account]),
+            password=password
+            )
+        """=======end============="""
 
+        if ctx.params['console']:
             console = Console(pyeth_api)
             console.start()
             server2 = Greenlet.spawn(
                 console.run
             )
-
         # wait for interrupt
         event = gevent.event.Event()
         gevent.signal(signal.SIGQUIT, event.set)
@@ -191,6 +210,8 @@ def run(ctx, **kwargs):
         gevent.signal(signal.SIGUSR2, toggle_trace_profiler)
 
         event.wait()
+        proxy1.polling_events.stop()
+        proxy2.polling_events.stop()
         if server1 != None:
             server1.kill(block=True, timeout=10)
         if server2 != None:

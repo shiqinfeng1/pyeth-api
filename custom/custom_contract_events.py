@@ -181,8 +181,8 @@ def ATM_Deposit3_update_DBtable(event,tx_hash):
     return sql
 
 __pollingEventSet__ = {
-    'ethereum_Token_Transfer': {'filter_args':{"_to":""},'stage':[ATM_Deposit1_insert_DBtable,ATM_Deposit2_update_DBtable,ATM_Deposit2_insert_DBtable]},
-    'atmchain_foreignBridge_Deposit':{'filter_args':{"_from":""},'stage':[ATM_Deposit3_update_DBtable]},
+    'ethereum_ATMToken_Transfer': {'filter_args':{"_to":""},'stage':[ATM_Deposit1_insert_DBtable,ATM_Deposit2_update_DBtable,ATM_Deposit2_insert_DBtable]},
+    'atmchain_ForeignBridge_Deposit':{'filter_args':{"_from":""},'stage':[ATM_Deposit3_update_DBtable]},
 }
 
     

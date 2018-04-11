@@ -48,13 +48,13 @@ class ContractProxy(object):
             )
             setattr(self, function_name, function_proxy)
     
-    def poll_contract_event(self, fromBlock,event_name,*args,timeout=constant.DEFAULT_TIMEOUT, need_reload=true):
+    def poll_contract_event(self, fromBlock,event_name,timeout, need_reload,*args):
         """
         reload custom_contract_events module to get latest custom event filters
         """
         if need_reload:
             reload(custom_contract_events)
-            
+
         event = list()
         event_key = self.contract_name+'_'+event_name
         if event_key in custom_contract_events.__conditionSet__.keys(): 
