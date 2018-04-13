@@ -23,6 +23,7 @@ from binascii import hexlify, unhexlify
 from service.utils import (
     split_endpoint
 )
+import custom.custom_contract_events as custom_contract_events
 # ipython needs to accept "--gui gevent" option
 IPython.core.shellapp.InteractiveShellApp.gui.values += ('gevent',)
 inputhook_manager.register('gevent')(GeventInputHook)
@@ -65,9 +66,12 @@ class ATMChainTools(object):
         result = self.pyeth_api.query_currency_balance(chain_name,account)
         print('------------------------------------')
         print('{:<30}: {:,}'.format(account, result))
-
-    def deploy_ATM_contract(self,atm_address=None):
-        self.pyeth_api.deploy_ATM_contract(atm_address)
+    
+    def query_atmchain_balance(self,account):
+        result = self.pyeth_api.query_atmchain_balance('ethereum','atmchain',account)
+        print('------------------------------------')
+        for key in sorted(result.keys()):
+            print('{:<30}: {:,}'.format(key, result[key]))
 
     def new_account(self,chain_name, key=None):
         assert isinstance(key,str) and len(key)==64
@@ -84,7 +88,7 @@ class ATMChainTools(object):
         privkey = unhexlify(privkey)
         address = privatekey_to_address(privkey)
         print('{}: {}'.format(hexlify(privkey),hexlify(address)))
-
+    """
     def eth_accounts_list(self,chain_name):
         acc = self.pyeth_api.eth_accounts_list(chain_name)
         print('------------------------------------\n[ethereum user accounts]:')
@@ -105,20 +109,21 @@ class ATMChainTools(object):
         for k, v in enumerate(a2):
             print('{}: {}'.format(k,'0x'+v))
 
-    def query_atmchain_balance(self,account):
-        result = self.pyeth_api.query_atmchain_balance('ethereum','atmchain',account)
-        print('------------------------------------')
-        for key in sorted(result.keys()):
-            print('{:<30}: {:,}'.format(key, result[key]))
-
     def lock_ATM(self,adviser,lock_amount):
         self.pyeth_api.lock_ATM('ethereum','atmchain',adviser,lock_amount)
 
     def settle_ATM(self,scaner,settle_amount):
         self.pyeth_api.settle_ATM('ethereum','atmchain',scaner,settle_amount)
+    """
+    def ethereum_transfer_eth(self,sender,to,amount):
+        self.pyeth_api.transfer_currency("ethereum",sender,to,amount)
 
-    def transfer_ATM(self,chain_name,sender,to,amount,is_erc223):
-        self.pyeth_api.transfer_token(chain_name,contract_address,sender,to,amount,is_erc223)
+    def ethereum_transfer_ATM(self,sender,to,amount):
+        contract_address = custom_contract_events.__contractInfo__['ATMToken']['address']
+        if contract_address == "" or len(contract_address)!=40:
+            print("invalid ATM token address:{}".format(contract_address))
+            return
+        self.pyeth_api.transfer_token("ethereum",contract_address,sender,to,amount,False)
 
 class AppTwitterTools(object):
     def __init__(self, chain):

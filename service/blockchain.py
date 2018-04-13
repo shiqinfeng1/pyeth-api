@@ -220,7 +220,7 @@ class BlockChainProxy(object):
             client = self.get_jsonrpc_client_with_sender(attacher,password)
         else:
             client = self.jsonrpc_client_without_sender
-            
+
         if client == None:
             log.info("jsoon rpc client is nil.")
             return None
@@ -261,7 +261,7 @@ class BlockChainProxy(object):
             abi = all_contracts[contract_key]['abi']
 
         else: #非本代理部署的合约，但是没指定合约地址
-            log.info('{} is not deployed in local and contract address is nil. deploy contract first.'.format(contract_name))
+            log.info('{} is NOT deployed in LOCAL and contract address is NULL. deploy contract first.'.format(contract_name))
             return None
         return client.new_contract_proxy(
             contract_name,
@@ -295,7 +295,7 @@ class BlockChainProxy(object):
         fail = self.check_transaction_threw(transaction_hash)
         if fail:
             log.info('transaction({}) execute failed .'.format(transaction_hash))
-            return event_key, event
+            return "transaction execute failed", list(transaction_hash)
 
         """如果指定监听合约事件，过滤该合约事件"""
         if event_name != None and contract_proxy != None:
@@ -703,10 +703,9 @@ class JSONRPCClient(object):
         
         result = list()
         json_data = self.new_filter(contract_address,fromBlock=fromBlock)
-        
         for i in range(0, timeout + wait, wait):
             events = self.filter_changes(json_data)
-            log.info('waiting for transaction events...{}s\r'.format(i))
+            log.debug('waiting for transaction events...{}s\r'.format(i))
             if events:                
                 for match_log in events:
                     decoded_event = translator.decode_event(
@@ -737,7 +736,7 @@ class JSONRPCClient(object):
                 - Data arguments must be hex encoded starting with '0x'
         """
         request = self.protocol.create_request(method, args)
-        log.info("\nRPC Request: {}".format(request.serialize()))
+        log.debug("\nRPC Request: {}".format(request.serialize()))
         reply = self.transport.send_message(request.serialize())
 
         jsonrpc_reply = self.protocol.parse_reply(reply)
@@ -866,7 +865,7 @@ class JSONRPCClient(object):
 
         json_data = dict()
 
-        if sender is not None:
+        if sender is not None and sender!='' and sender!='0x':
             json_data['from'] = address_encoder(sender)
 
         if to is not None:
@@ -1085,11 +1084,11 @@ class JSONRPCClient(object):
 
                 last_result = transaction
                 
-                print 'waiting for transaction to be mined... %3ds\r' % (count),
+                print 'waiting for transaction %s to be mined... %3ds\r' % (transaction_hash,count),
                 sys.stdout.flush()
                 count = count+1
                 gevent.sleep(1)
-            print '\n'
+            print '\nto be mined ok.\n'
             if confirmations:
                 # this will wait for both APPLIED and REVERTED transactions
                 transaction_block = quantity_decoder(transaction['blockNumber'])
@@ -1098,7 +1097,7 @@ class JSONRPCClient(object):
                 block_number = self.block_number()
                 print '\n'
                 while block_number < confirmation_block:
-                    print 'waiting for transaction confirm... %d/%d \r' % (block_number+confirmations-confirmation_block,confirmations),
+                    print 'waiting for transaction %s confirm... %d/%d \r' % (transaction_hash,block_number+confirmations-confirmation_block,confirmations),
                     sys.stdout.flush()
                     gevent.sleep(1)
                     block_number = self.block_number()

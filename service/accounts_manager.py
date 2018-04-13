@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import getpass
+import click
 import sys
 import os
 import random
@@ -271,7 +271,8 @@ class AccountManager(object):
         assert isinstance(address,str)
         assert len(address) == 42 and address[:2]=='0x'
         
-        password = getpass.getpass('Enter the password to unlock %s: ' % old_address)
+        password = click.prompt('Enter the password to unlock %s' % old_address, default='', hide_input=True,
+                                confirmation_prompt=False, show_default=False)
         acc = Account.load(self.keystore_path,password)
         if acc.locked == False:
             self.admin_account = address
@@ -356,7 +357,8 @@ class AccountManager(object):
         if password_file:
             password = password_file.read().splitlines()[0]
         if password is None:
-            password = getpass.getpass('Enter the password to unlock %s: ' % address)
+            password = click.prompt('Enter the password to unlock %s' % address, default='', hide_input=True,
+                                confirmation_prompt=False, show_default=False)
         acc = Account(data, password, self.accounts[address])
         return acc
 

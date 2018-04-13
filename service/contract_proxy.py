@@ -66,7 +66,7 @@ class ContractProxy(object):
                 condition(*args),
                 timeout = timeout
                 )
-            log.info('Polled event(with filter {}): {}'.format(event_key,event))
+            log.debug('Polled event(with filter {}): {}'.format(event_key,event))
         else:
             log.info('unknow event_key={})'.format(event_key))
         return event_key,event

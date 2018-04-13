@@ -112,14 +112,14 @@ def TwitterAccount_Log_bind_account_filter_condition(_id):
 
     return filter
 
-def HomeBridge_Deposit_filter_condition():
+def ForeignBridge_Deposit_filter_condition():
     def filter(event):
         if event['_event_type'] != 'Deposit':
             return False
         return True
     return filter
 
-def HomeBridge_Withdraw_filter_condition():
+def ForeignBridge_Withdraw_filter_condition():
     def filter(event):
         if event['_event_type'] != 'Withdraw':
             return False
@@ -142,8 +142,8 @@ __conditionSet__ = {
     'TwitterAccount_Log_lotus_result': TwitterAccount_Log_lotus_result_filter_condition,
     'TwitterAccount_Log_lotus': TwitterAccount_Log_lotus_filter_condition,
 
-    'HomeBridge_Deposit': HomeBridge_Deposit_filter_condition,
-    'HomeBridge_Withdraw': HomeBridge_Withdraw_filter_condition,
+    'ForeignBridge_Deposit': ForeignBridge_Deposit_filter_condition,
+    'ForeignBridge_Withdraw': ForeignBridge_Withdraw_filter_condition,
 }
 
 
@@ -181,8 +181,15 @@ def ATM_Deposit3_update_DBtable(event,tx_hash):
     return sql
 
 __pollingEventSet__ = {
-    'ethereum_ATMToken_Transfer': {'filter_args':{"_to":""},'stage':[ATM_Deposit1_insert_DBtable,ATM_Deposit2_update_DBtable,ATM_Deposit2_insert_DBtable]},
-    'atmchain_ForeignBridge_Deposit':{'filter_args':{"_from":""},'stage':[ATM_Deposit3_update_DBtable]},
+    'ethereum_ATMToken_Transfer': {'filter_args':["69eb6e2b2dc66268482467b9b35369dc5c656cf0"],'stage':[ATM_Deposit1_insert_DBtable,ATM_Deposit2_update_DBtable,ATM_Deposit2_insert_DBtable]},
+    'atmchain_ForeignBridge_Deposit':{'filter_args':[],'stage':[ATM_Deposit3_update_DBtable]},
+}
+
+__contractInfo__ = {
+    'ContractAddress':{'file':'ContractAddress.sol','address':"de66acec6aa735d8407f57a5e5746e92777d9050"},
+    'ATMToken':{'file':'ATMToken.sol','address':""},
+    'HomeBridge':{'file':'bridge.sol','address':"69eb6e2b2dc66268482467b9b35369dc5c656cf0"},
+    'ForeignBridge':{'file':'bridge.sol','address':"c203652af03d7e8e0975f776b78861e7e3801f99"},
 }
 
     

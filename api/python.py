@@ -7,6 +7,7 @@ from service.utils import (
     address_encoder,
     address_decoder,
 )
+import click
 import time
 import gevent
 from gevent import Greenlet
@@ -85,18 +86,28 @@ class PYETHAPI(object):
 
     """原生币转账"""
     def transfer_currency(self,chain_name,sender,to,amount):
+        password = click.prompt('Password to transfer currency coin', default='', hide_input=True,
+                                confirmation_prompt=False, show_default=False)
         _proxy = self._get_chain_proxy(chain_name)
-        amount = amount * constant.WEI_TO_ETH
-        _proxy.transfer_currency(sender,to,amount)
+        #amount = amount * constant.WEI_TO_ETH
+        transaction_hash_hex = _proxy.transfer_currency(sender, to, amount, password=password)
+        _proxy.poll_contarct_transaction_result(transaction_hash_hex)
     
     """token转账"""
     def transfer_token(self,chain_name,contract_address,sender,to,amount,is_erc223=False):
+        password = click.prompt('Password to transfer ATM token', default='', hide_input=True,
+                                confirmation_prompt=False, show_default=False)
         _proxy = self._get_chain_proxy(chain_name)
+        if contract_address[:2] == "0x":
+            contract_address = contract_address[2:]
+        if sender[:2] == "0x":
+            sender = sender[2:]
         contract_proxy = _proxy.attach_contract(
-            'Token',
-            contract_file='Token.sol',
-            contract_address=contract_address,
+            'ATMToken',
+            contract_file='ATMToken.sol',
+            contract_address=unhexlify(contract_address),
             attacher=sender,
+            password=password,
         )
         block_number = _proxy.block_number()
         #由于pythpn版本以太坊暂时无法处理同名函数, 暂时通过flag来区分
@@ -263,13 +274,17 @@ class POLLING_EVENTS(object):
             chain_name,contract_name,event_name = key.split('_')[:3]
             self.polling_events[chain_name] = dict()
             self.polling_events[chain_name][contract_name] = dict()
-            self.polling_events[chain_name][contract_name][event_name] = dict()
-            self.polling_events[chain_name][contract_name][event_name]["filter_args"] = custom_contract_events.__pollingEventSet__[key]['filter_args']
+            self.polling_events[chain_name][contract_name][event_name] = custom_contract_events.__pollingEventSet__[key]
 
             key = chain_name + '_' + contract_name
-            if self.polling_events_contract_proxy_cache.get(key) == None:
-                self.polling_events_contract_proxy_cache[key] = self.blockchain_proxy[chain_name].attach_contract(contract_name)
+            if self.polling_events_contract_proxy_cache.get(key) == None and \
+                custom_contract_events.__contractInfo__[contract_name]['address']!="":
 
+                self.polling_events_contract_proxy_cache[key] = \
+                    self.blockchain_proxy[chain_name].attach_contract(
+                    contract_name,
+                    contract_file=custom_contract_events.__contractInfo__[contract_name]['file'], 
+                    contract_address=unhexlify(custom_contract_events.__contractInfo__[contract_name]['address']),)
     
     def run(self,chain_name,_proxy):
         print('[CHAIN {}]satrt polling contract event...'.format(chain_name))
@@ -277,7 +292,7 @@ class POLLING_EVENTS(object):
 
         while not self.is_stopped:
             gevent.sleep(self.polling_delay)
-            print('@@@@@@@@ CHAIN [{}] tick {}.----------------------------'.format(chain_name,time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
+            #print('@@@@@@@@ CHAIN [{}] tick {}.----------------------------'.format(chain_name,time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time()))))
             self.update_polling_event()
            
             if chain_name in self.polling_events.keys() : 
@@ -296,11 +311,14 @@ class POLLING_EVENTS(object):
                             self.polled_blocknumber,
                             event_name,
                             0,False,
-                            self.polling_events[chain_name][contract_name][event_name]["filter_args"]
+                            *self.polling_events[chain_name][contract_name][event_name]["filter_args"]
                         )
+                        if event == list():
+                            #print('@@@@@@@@ CHAIN [{}] contract [{}] event [{}] not emitted.'.format(chain_name,contract_name,event_name))
+                            continue
                         DBcallback = self.DBService.polling_events_callback[chain_name + '_' + contract_name + '_' + event_name]
                         sql_sets = self.polling_events[chain_name][contract_name][event_name]['stage']
-                        DBcallback(sql_sets,event['transaction_hash'],(event))
+                        DBcallback(sql_sets,event[0]['transaction_hash'],(event))
                         
                 self.polled_blocknumber = polling_current_blocknumber
 
@@ -322,7 +340,7 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
             _proxy,
         ) 
         return _proxy
-
+    """
     def ATM_accounts_list(self): 
         contract_Addresses=dict()
         ethereum_proxy = self._get_chain_proxy('ethereum')
@@ -379,7 +397,7 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
             )
 
 
-    """
+   
     def lock_ATM(self,from_chain,to_chain,advertiser,lock_amount):
         
         ethereum_proxy = self._get_chain_proxy(from_chain)
@@ -465,23 +483,18 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
         atmchain_proxy = self._get_chain_proxy(dest_chain)
 
         ERC20Token_ethereum = ethereum_proxy.attach_contract(
-            'ATMToken'
-            )
+                    'ATMToken',
+                    contract_file=custom_contract_events.__contractInfo__['ATMToken']['file'], 
+                    contract_address=unhexlify(custom_contract_events.__contractInfo__['ATMToken']['address']),)
 
-        ERC223Token_atmchain = atmchain_proxy.attach_contract(
-            'ERC223Token'
-            )
-
-        temp = ethereum_proxy.balance(address_decoder(account))
-        result['ETH balance in ethereum'] = float(temp)/constant.WEI_TO_ETH
+        temp = self.query_currency_balance(src_chain, account)
+        result['ETH balance in ethereum'] = temp
 
         temp = ERC20Token_ethereum.balanceOf(account) if ERC20Token_ethereum != None else 0
         result['ATM balance in ethereum'] = float(temp)/constant.ATM_DECIMALS 
     
-        temp = atmchain_proxy.balance(address_decoder(account))
-        result['ETH balance in atmchain'] = float(temp)/constant.WEI_TO_ETH
+        temp = self.query_currency_balance(dest_chain, account)
+        result['ATM balance in atmchain'] = temp
         
-        temp = ERC223Token_atmchain.balanceOf(account) if ERC223Token_atmchain != None else 0
-        result['ATM balance in atmchain'] = float(temp)/constant.ATM_DECIMALS
     
         return result
