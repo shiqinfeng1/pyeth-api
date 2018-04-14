@@ -261,8 +261,8 @@ def run(ctx, **kwargs):
         gevent.signal(signal.SIGUSR2, toggle_trace_profiler)
 
         event.wait()
-        proxy1.polling_events.stop()
-        proxy2.polling_events.stop()
+        pyeth_api.listen_contract_events.stop()
+        pyeth_api.atm_deposit_worker.stop()
         if server1 != None:
             server1.kill(block=True, timeout=10)
         if server2 != None:
