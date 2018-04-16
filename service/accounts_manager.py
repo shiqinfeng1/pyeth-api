@@ -242,6 +242,7 @@ class AccountManager(object):
     def __init__(self, keystore_path=None):
         self.keystore_path = keystore_path
         self.accounts = {}
+        self.admin_password = 0
         if self.keystore_path is None:
             self.keystore_path = find_keystoredir()
         if self.keystore_path is not None:
@@ -267,6 +268,12 @@ class AccountManager(object):
         else:
             self.admin_account = None
 
+    def set_admin_password(self, pwd):
+        self.admin_password = pwd
+        
+    def get_admin_password(self):
+        return self.admin_password
+
     def set_admin_account(self, old_address,address):
         assert isinstance(address,str)
         assert len(address) == 42 and address[:2]=='0x'
@@ -279,7 +286,9 @@ class AccountManager(object):
             acc.lock()
         else:
             print('set admin account fail.')
-        
+
+    def get_admin_account(self):
+        return self.admin_account
 
     def address_in_keystore(self, address):
         if address is None:

@@ -178,20 +178,21 @@ def run(ctx, **kwargs):
             )
 
         """======创建链代理，并部署相关合约============"""
-        proxy1 = pyeth_api.new_blockchain_proxy("ethereum","localhost:21024",os.getcwd()+'/'+sys.argv[0]+'/keystore')
-        proxy2 = pyeth_api.new_blockchain_proxy("atmchain","localhost:21024",os.getcwd()+'/'+sys.argv[0]+'/keystore')
+        proxy1 = pyeth_api.new_blockchain_proxy("ethereum","118.31.71.12:21024",os.getcwd()+'/'+sys.argv[0]+'/keystore')
+        proxy2 = pyeth_api.new_blockchain_proxy("atmchain","118.31.71.12:21024",os.getcwd()+'/'+sys.argv[0]+'/keystore')
         
-        account = "0x5252781539b365e08015fa7ed77af5a36097f39d"
-        password = click.prompt('Enter the password to unlock %s' % account, default='', hide_input=True,
+        account = pyeth_api.get_admin_account('atmchain')
+        admin_password = click.prompt('Enter the password to unlock %s' % account, default='', hide_input=True,
                                 confirmation_prompt=False, show_default=False)
-        
+        pyeth_api.set_admin_password('atmchain',admin_password)
+
         ContractAddress = custom_contract_events.__contractInfo__['ContractAddress']['address']
 
         if ContractAddress == "":
             ContractAddress_proxy = proxy2.deploy_contract( 
                 account,
                 custom_contract_events.__contractInfo__['ContractAddress']['file'], 'ContractAddress',
-                password=password,
+                password=admin_password,
             )
         else:
             ContractAddress_proxy = proxy2.attach_contract(
@@ -199,7 +200,7 @@ def run(ctx, **kwargs):
                 contract_file = custom_contract_events.__contractInfo__['ContractAddress']['file'],
                 contract_address = unhexlify(ContractAddress), #ContractAddress.address, 
                 attacher = account,
-                password=password,
+                password=admin_password,
             )
         
         if custom_contract_events.__contractInfo__['ForeignBridge']['address'] == "":
@@ -207,7 +208,7 @@ def run(ctx, **kwargs):
                 account,
                 custom_contract_events.__contractInfo__['ForeignBridge']['file'], 'ForeignBridge',
                 (1,[account]),
-                password=password
+                password=admin_password
                 )
             txhash = ContractAddress_proxy.set_foreigin_bridge('0x'+hexlify(foreignbridge_proxy.address))
             result, txhash = proxy2.poll_contarct_transaction_result(txhash) 
@@ -220,7 +221,7 @@ def run(ctx, **kwargs):
             ATMToken_proxy = proxy1.deploy_contract( 
                 account,
                 custom_contract_events.__contractInfo__['ATMToken']['file'], 'ATMToken',
-                password=password
+                password=admin_password
                 )
             txhash = ContractAddress_proxy.set_atm_token('0x'+hexlify(ATMToken_proxy.address))
             result, txhash = proxy1.poll_contarct_transaction_result(txhash) 
@@ -234,7 +235,7 @@ def run(ctx, **kwargs):
                 account,
                 custom_contract_events.__contractInfo__['HomeBridge']['file'], 'HomeBridge',
                 (1,[account]),
-                password=password
+                password=admin_password
                 )
             txhash = ContractAddress_proxy.set_home_bridge('0x'+hexlify(ATMToken_proxy.address))
             result, txhash = proxy1.poll_contarct_transaction_result(txhash) 

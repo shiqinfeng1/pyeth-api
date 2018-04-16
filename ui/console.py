@@ -88,20 +88,19 @@ class ATMChainTools(object):
         privkey = unhexlify(privkey)
         address = privatekey_to_address(privkey)
         print('{}: {}'.format(hexlify(privkey),hexlify(address)))
-    """
-    def eth_accounts_list(self,chain_name):
+    
+    def accounts_list(self,chain_name):
         acc = self.pyeth_api.eth_accounts_list(chain_name)
         print('------------------------------------\n[ethereum user accounts]:')
         for k, v in enumerate(acc):
             print('{}: {}'.format(k,'0x'+v))
         print('------------------------------------')
-
+    """
     def ATM_accounts_list(self): 
         a0,a1,a2 = self.pyeth_api.ATM_accounts_list()
         print('------------------------------------\n[contract addresses]:')
         for k, v in a0.iteritems():
             print('{}: {}'.format(k,v))
-            print('|--owner: {}'.format(self.pyeth_api.adminAddress))
         print('------------------------------------\n[ethereum user accounts]:')
         for k, v in enumerate(a1):
             print('{}: {}'.format(k,'0x'+v))

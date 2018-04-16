@@ -94,9 +94,10 @@ class MethodProxy(object):
         self.estimate_function = estimate_function
 
     def transact(self, *args, **kargs):
+        #print('self.function_name, args => data',self.function_name, args,kargs,self.valid_kargs)
         assert set(kargs.keys()).issubset(self.valid_kargs)
         data = self.translator.encode(self.function_name, args)
-        #print('self.function_name, args => data',self.function_name, args, hexlify(data))
+        
         txhash = self.transaction_function(
             sender=self.sender,
             to=self.contract_address,
@@ -110,7 +111,6 @@ class MethodProxy(object):
     def call(self, *args, **kargs):
         assert set(kargs.keys()).issubset(self.valid_kargs)
         data = self.translator.encode(self.function_name, args)
-
         res = self.call_function(
             sender=self.sender,
             to=self.contract_address,
@@ -142,6 +142,7 @@ class MethodProxy(object):
         return res
 
     def __call__(self, *args, **kargs):
+        #print('__call__(self, *args, **kargs)',args, kargs)
         if self.translator.function_data[self.function_name]['is_constant']:
             result = self.call(*args, **kargs)
         else:

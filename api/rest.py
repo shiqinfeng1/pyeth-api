@@ -42,7 +42,6 @@ class APIServer(object):
         self.flask_app.register_blueprint(self.blueprint)
 
     def _add_default_resources(self):
-        self.add_resource(AddressResource, '/adminAddress')
         self.add_resource(TokensResource, '/asset')
         """
         self.add_resource(ChannelsResource, '/channels')
@@ -91,9 +90,6 @@ class RestAPI(object):
 
     def __init__(self, pyeth_api):
         self.pyeth_api = pyeth_api
-
-    def get_admin_address(self):
-        return {'admin_address': self.pyeth_api.adminAddress}
 
     def deploy_contract(self,chain,user_address,decimals,total_suply,name,symbol):
         ethereum_proxy = self.pyeth_api._get_chain_proxy(chain)

@@ -228,12 +228,15 @@ contract ForeignBridge {
     /// deposit recipient (bytes20)
     /// deposit value (uint256)
     /// mainnet transaction hash (bytes32) // to avoid transaction duplication
-    function deposit(address recipient, uint256 value, bytes32 transactionHash) public onlyAuthority() {
+    function deposit(address recipient, uint256 value, bytes32 transactionHash) payable public onlyAuthority() {
         // Protection from misbehaving authority
         bytes32 hash = keccak256(recipient, value, transactionHash);
 
         // don't allow authority to confirm deposit twice
-        require(!addressArrayContains(deposits[hash], msg.sender));
+        if (addressArrayContains(deposits[hash], msg.sender) == true){
+            Deposit(recipient, 0, transactionHash);
+            return;
+        }
 
         deposits[hash].push(msg.sender);
 
@@ -242,9 +245,10 @@ contract ForeignBridge {
             DepositConfirmation(recipient, value, transactionHash);
             return;
         }
-        recipient.transfer(value * (10**8));
-        Deposit(recipient, value * (10**8), transactionHash);
+        recipient.transfer(msg.value * (10**8));
+        Deposit(recipient, msg.value * (10**8), transactionHash);
     }
+
 /*
     /// Transfer `value` from `msg.sender`s local balance (on `foreign` chain) to `recipient` on `home` chain.
     ///

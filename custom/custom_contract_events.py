@@ -189,7 +189,7 @@ __contractInfo__ = {
     'ContractAddress':{'file':'ContractAddress.sol','address':"de66acec6aa735d8407f57a5e5746e92777d9050"},
     'ATMToken':{'file':'ATMToken.sol','address':"1343f98dcb7c867d553696d506cc87da995b75d2"},
     'HomeBridge':{'file':'bridge.sol','address':"69eb6e2b2dc66268482467b9b35369dc5c656cf0"},
-    'ForeignBridge':{'file':'bridge.sol','address':"c203652af03d7e8e0975f776b78861e7e3801f99"},
+    'ForeignBridge':{'file':'bridge.sol','address':"8fa42af3b976d157e4f260baeb43fc79e54d26a1"},
 }
 
 __DBConfig__ = {
