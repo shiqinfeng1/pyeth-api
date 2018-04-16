@@ -353,6 +353,14 @@ class ATM_DEPOSIT_WORKER(object):
         txhash = contract_proxy.deposit('0x'+recipient,value,unhexlify(tx_hash_src[2:]),value=value)
         _proxy.poll_contarct_transaction_result(txhash)
 
+    def deposit_manual(self,id):
+        result = self.DBService.find_rows('DEPOSIT',"STAGE = '2' AND CHAIN_NAME_DEST = 'atmchain' AND ID < {}".format(id))
+        if result == None or result == tuple():
+            return
+        else:
+            for record in result:
+                self.deposit(record[1], record[2], record[5])
+
     def stop(self):
         self.is_stopped = True
         self.DBService.disconnect()
@@ -453,6 +461,10 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
         self.listen_contract_events.add_new_chain(chain_name,_proxy)
         self.atm_deposit_worker.add_new_chain(chain_name,_proxy)
         return _proxy
+
+    def deposit_atm_manual(self,id):
+        self.atm_deposit_worker.deposit_manual(id)
+
     """
     def ATM_accounts_list(self): 
         contract_Addresses=dict()
@@ -475,40 +487,6 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
         contract_Addresses['ERC223Token_address'] = address_encoder(ERC223Token_atmchain_address) if ERC223Token_atmchain_address != None else 'NOT deployed'
 
         return contract_Addresses,self.eth_accounts_list('ethereum'),self.eth_accounts_list('atmchain')
-
-    def deploy_ATM_contract(self,atm_address=None): 
-        
-        ethereum_proxy = self._get_chain_proxy('ethereum')
-        ethereum_sender = ethereum_proxy.account_manager.admin_account
-        atmchain_proxy = self._get_chain_proxy('atmchain')
-        atmchain_sender = atmchain_proxy.account_manager.admin_account
-
-        ERC223Token_atmchain_owner = atmchain_proxy.deploy_contract( 
-            atmchain_sender,
-            'ERC223Token.sol', 'ERC223Token',
-            (100000,'REX',8,'REX Token'),
-            )
-
-        if atm_address == None:
-            ERC20Token_ethereum_owner = ethereum_proxy.deploy_contract( 
-                ethereum_sender,
-                'ATMToken.sol', 'ATMToken',
-                )
-            atm_address = ERC20Token_ethereum_owner.address
-        else:
-            ethereum_proxy = self._get_chain_proxy('ethereum')
-            ERC20Token_ethereum_owner = ethereum_proxy.attach_contract(
-                'ATMToken.sol','ATMToken',
-                contract_address=atm_address,
-                attacher=ethereum_sender,
-                )
-
-        TokenExchange_ethereum_owner = ethereum_proxy.deploy_contract( 
-            ethereum_sender, 
-            'TokenExchange.sol', 'TokenExchange',
-            (hexlify(atm_address),)
-            )
-
 
    
     def lock_ATM(self,from_chain,to_chain,advertiser,lock_amount):
