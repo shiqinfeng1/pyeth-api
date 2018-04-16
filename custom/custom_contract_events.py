@@ -172,11 +172,11 @@ def ATM_Deposit2_insert_DBtable(event):
 
     return sql
 
-def ATM_Deposit3_update_DBtable(event,tx_hash):
+def ATM_Deposit3_update_DBtable(event):
     sql = "UPDATE DEPOSIT SET STAGE = '%d', \
         CHAIN_NAME_DEST = '%s', TRANSACTION_HASH_DEST = '%s', BLOCK_NUMBER_DEST = '%d',TIME_STAMP = '%s') \
         WHERE TRANSACTION_HASH_SRC = '%s'" % \
-        (3, 'atmchain', event['transaction_hash'], event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), tx_hash)
+        (3, 'atmchain', event['transaction_hash'], event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), event['transactionHash'])
 
     return sql
 
@@ -189,7 +189,7 @@ __contractInfo__ = {
     'ContractAddress':{'file':'ContractAddress.sol','address':"de66acec6aa735d8407f57a5e5746e92777d9050"},
     'ATMToken':{'file':'ATMToken.sol','address':"1343f98dcb7c867d553696d506cc87da995b75d2"},
     'HomeBridge':{'file':'bridge.sol','address':"69eb6e2b2dc66268482467b9b35369dc5c656cf0"},
-    'ForeignBridge':{'file':'bridge.sol','address':"8fa42af3b976d157e4f260baeb43fc79e54d26a1"},
+    'ForeignBridge':{'file':'bridge.sol','address':"45d744d325160791941a7689f70ed841cf49207f"},
 }
 
 __DBConfig__ = {

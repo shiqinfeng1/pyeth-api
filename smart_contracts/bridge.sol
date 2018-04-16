@@ -245,8 +245,8 @@ contract ForeignBridge {
             DepositConfirmation(recipient, value, transactionHash);
             return;
         }
-        recipient.transfer(msg.value * (10**8));
-        Deposit(recipient, msg.value * (10**8), transactionHash);
+        recipient.transfer(msg.value );
+        Deposit(recipient, msg.value, transactionHash);
     }
 
 /*

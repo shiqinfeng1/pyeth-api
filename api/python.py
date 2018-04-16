@@ -339,6 +339,7 @@ class ATM_DEPOSIT_WORKER(object):
                     self.deposit(record[1], record[2], record[5])
 
     def deposit(self, recipient, value, tx_hash_src):
+        value = value * (10**8)
         print("deposit {} to {} for transaction_hash:{}".format(value, recipient, tx_hash_src))
         _proxy = self.current_blockchain_proxy['atmchain']
         admin_account = _proxy.account_manager.get_admin_account()
