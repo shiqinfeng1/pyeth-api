@@ -168,6 +168,7 @@ class BlockChainProxy(object):
             
         self.chain_name = chain_name
         self.local_contract_proxys =  dict()
+        self.remote_contract_proxys =  dict()
         self.jsonrpc_proxys =  dict()
         self.account_manager = accounts_manager.AccountManager(keystore_path)
         self.third_party_endpoint = None
@@ -220,10 +221,13 @@ class BlockChainProxy(object):
             client = self.get_jsonrpc_client_with_sender(attacher,password)
         else:
             client = self.jsonrpc_client_without_sender
-
+            attacher = 'anonymous'
         if client == None:
             log.info("jsoon rpc client is nil.")
             return None
+
+        if self.remote_contract_proxys.get(contract_name+'_'+attacher) != None:
+            return self.remote_contract_proxys[contract_name+'_'+attacher]
 
         """检查是否为本代理部署的合约"""
         contract_local = self.local_contract_proxys.get(contract_name)
@@ -263,11 +267,13 @@ class BlockChainProxy(object):
         else: #非本代理部署的合约，但是没指定合约地址
             log.info('{} is NOT deployed in LOCAL and contract address is NULL. deploy contract first.'.format(contract_name))
             return None
-        return client.new_contract_proxy(
+        proxy = client.new_contract_proxy(
             contract_name,
             abi,
             contract_address,
         )
+        self.remote_contract_proxys[contract_name+'_'+attacher] = proxy
+        return proxy
     
     """检查交易是否失败"""
     def check_transaction_threw(self,transaction_hash):
@@ -310,26 +316,29 @@ class BlockChainProxy(object):
         sender, contract_file, contract_name,
         constructor_parameters=tuple(),
         password=None):
+        try:
+            client = self.get_jsonrpc_client_with_sender(sender,password)
+            if client == None:
+                return None
 
-        client = self.get_jsonrpc_client_with_sender(sender,password)
-        if client == None:
-            return
-
-        path = get_contract_path(contract_file)
-        workdir, filename = os.path.split(path)
-        log.info('\ndeploying contract: {}. Paras:{}. \nsender: {}. \nworkdir: {}.\n'.format(
-            contract_name,constructor_parameters,sender,path))
-        all_contracts = compile_file(path, libraries=dict())
-        contract_proxy = client.deploy_solidity_contract(
-            unhexlify(sender[2:]),
-            contract_name, #contract_name
-            all_contracts, #all_contracts
-            dict(),  #libraries dict()
-            constructor_parameters, #constructor_parameters tuple() (p1, p2, p3, p4)
-            contract_path = path,
-            gasprice=constant.GAS_PRICE,
-            timeout=constant.DEFAULT_POLL_TIMEOUT,
-        )
+            path = get_contract_path(contract_file)
+            workdir, filename = os.path.split(path)
+            log.info('\ndeploying contract: {}. Paras:{}. \nsender: {}. \nworkdir: {}.\n'.format(
+                contract_name,constructor_parameters,sender,path))
+            all_contracts = compile_file(path, libraries=dict())
+            contract_proxy = client.deploy_solidity_contract(
+                unhexlify(sender[2:]),
+                contract_name, #contract_name
+                all_contracts, #all_contracts
+                dict(),  #libraries dict()
+                constructor_parameters, #constructor_parameters tuple() (p1, p2, p3, p4)
+                contract_path = path,
+                gasprice=constant.GAS_PRICE,
+                timeout=constant.DEFAULT_POLL_TIMEOUT,
+            )
+        except Exception:
+            print(Exception)
+            return None
         log.info('deploying contract: [{}] ok. address: {} .'.format(contract_name,hexlify(contract_proxy.address)))
         self.local_contract_proxys[contract_name] = contract_proxy
         return contract_proxy
@@ -409,6 +418,8 @@ class BlockChainProxy(object):
                 'eth_sendRawTransaction',
                 tx_data # data_encoder(tx_data.decode('hex')), # data_encoder(rlp.encode(tx_data)),  #
             )
+        if result == None:
+            return ''
         return result[2 if result.startswith('0x') else 0:]
 
 class JSONRPCClient(object):

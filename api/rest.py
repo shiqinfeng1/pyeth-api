@@ -67,33 +67,48 @@ class RestAPI(object):
         self.pyeth_api = pyeth_api
 
     def deploy_contract(self, chain, user_address, decimals, total_suply, name, symbol):
-        ethereum_proxy = self.pyeth_api._get_chain_proxy(chain)
-        userToken = ethereum_proxy.deploy_contract( 
-            ethereum_proxy.account_manager.admin_account, 
+        _proxy = self.pyeth_api._get_chain_proxy(chain)
+        userToken = _proxy.deploy_contract( 
+            _proxy.account_manager.admin_account, 
             'userToken.sol', 'userToken',
             (hexlify(user_address),total_suply,hexlify(symbol),decimals,hexlify(name)),
-            password = '123456',
+            password = _proxy.account_manager.get_admin_password(),
         )
+        if userToken == None:
+            return {'result':'fail','contract_address': ''}
         address = userToken.address
         print("deployed address:", hexlify(address))
-        return {'contract_address': hexlify(address)}
+        return {'result':'success','contract_address': hexlify(address)}
 
     def query_atm_deposit_status(self, user_address, transaction_hash):
         result = self.pyeth_api.query_atm_deposit_status(user_address, transaction_hash)
-        return {'atm_deposit_status': result}
+        if result == None or result == list():
+            return {'result':'fail','atm_deposit_status': list()}
+        
+        keys = ['ID','USER_ADDRESS','AMOUNT','STAGE','CHAIN_NAME_SRC','TRANSACTION_HASH_SRC','BLOCK_NUMBER_SRC','CHAIN_NAME_DEST','TRANSACTION_HASH_DEST','BLOCK_NUMBER_DEST','TIME_STAMP']
+        total = list()
+        for rec in result:
+            dictionary = dict(zip(keys, list(rec)))
+            total.append(dictionary)
+
+        return {'result':'success','atm_deposit_status': total}
     
     def send_raw_transaction(self, chain_name,signed_data):
         result = self.pyeth_api.send_raw_transaction(chain_name,signed_data)
-        return {'transaction_hash': '0x'+result}
+        if result == '':
+            return {'result':'fail','transaction_hash': result}
+        return {'result':'success','transaction_hash': '0x'+result}
 
     def query_nonce(self, chain_name,user):
         result = self.pyeth_api.get_nonce(chain_name,user)
-        return {'nonce': result}
+        return {'result':'success','nonce': result}
 
     def query_deposit_limit(self):
         result = self.pyeth_api.get_deposit_limit()
-        return {'deposit_limit': result}
+        return {'result':'success','deposit_limit': result}
     
     def query_balance(self,user):
         result = self.pyeth_api.query_atmchain_balance('ethereum','atmchain',user)
-        return {'balance': result}
+        if result == dict():
+            return {'result':'fail','balance': dict()}
+        return {'result':'success','balance': result}

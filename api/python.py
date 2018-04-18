@@ -7,6 +7,7 @@ from service.utils import (
     address_encoder,
     address_decoder,
 )
+import threading
 import click
 import time
 import gevent
@@ -17,6 +18,7 @@ from service.accounts_manager import Account,find_keystoredir
 from ethereum.utils import encode_hex
 import custom.custom_contract_events as custom_contract_events
 
+lock = threading.Lock()
 
 class PYETHAPI(object):
     """ CLI interface. """
@@ -126,12 +128,6 @@ class PYETHAPI(object):
         _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Transfer',to)
         _proxy.account_manager.get_account(sender,password).lock()
 
-    """执行离线交易"""
-    def send_raw_transaction(self,chain_name,signed_data):
-        _proxy = self._get_chain_proxy(chain_name)
-        transaction_hash = _proxy.sendRawTransaction(signed_data)
-        return transaction_hash
-
     def get_nonce(self,chain_name,user):
         if chain_name == None or chain_name=='':
             chain_name = 'ethereum'
@@ -153,6 +149,7 @@ class DBService(object):
 
     def __init__(self):
         self.db = None
+        self.is_DEPOSIT_table_exist = False
         self.polling_events_callback = dict()
         self.polling_events_callback['ethereum_ATMToken_Transfer_offline'] = self.ethereum_ATMToken_Transfer_offline_to_DB
         self.polling_events_callback['ethereum_ATMToken_Transfer'] = self.ethereum_ATMToken_Transfer_to_DB
@@ -234,7 +231,6 @@ class DBService(object):
                 if custom_contract_events.__DBConfig__['db'] in row:
                     exsist = True
             if exsist == False:
-                #cursor.execute('drop database if exists ' + custom_contract_events.__DBConfig__['db'])
                 cursor.execute('create database if not exists ' + custom_contract_events.__DBConfig__['db'])
                 # 提交到数据库执行
                 self.db.commit()
@@ -251,24 +247,35 @@ class DBService(object):
         sql="create table %s("%(tablename,)
         sql+=columns+')'
         try:
+            lock.acquire()
             cursor.execute(sql)
             print("Table %s is created"%tablename)
+            self.db.commit()
+            lock.release()
         except:
             self.db.rollback()
 
     def is_table_exist(self, dbname, tablename):
+        if tablename == 'DEPOSIT' and self.is_DEPOSIT_table_exist == True:
+            return True
+            
         cursor=self.db.cursor()
         sql="select table_name from information_schema.TABLES where table_schema='%s' and table_name = '%s'"%(dbname,tablename)
         try:
+            lock.acquire()
             cursor.execute(sql)
             results = cursor.fetchall() #接受全部返回行
-        except:
+            self.db.commit()
+            lock.release()
+        except Exception,e:
             #不存在这张表返回错误提示
-            print('query table {} fail.'.format(tablename))
+            print('query db {} table {} fail:{}'.format(dbname,tablename,e.message))
             return False
         if not results:
             return False
         else:
+            if tablename == 'DEPOSIT':
+                self.is_DEPOSIT_table_exist = True
             return True
 
     """datas = {(key: value),.....}"""
@@ -289,8 +296,10 @@ class DBService(object):
         for sql in sqls:
             # 执行sql语句
             try:
+                lock.acquire()
                 cursor.execute(sql)
                 self.db.commit()
+                lock.release()
             except:
                 self.db.rollback()
 
@@ -299,8 +308,10 @@ class DBService(object):
         sql = "select COLUMN_NAME from information_schema.columns where table_name='%s'" % tablename
         cursor = self.db.cursor()
         try:
+            lock.acquire()
             cursor.execute(sql)
             self.db.commit()
+            lock.release()
             results = cursor.fetchall()
         except:
             return tuple()
@@ -326,8 +337,10 @@ class DBService(object):
             sql = "select %s from %s where %s" % (fieldNameStr, tablename, condition)
             
         try:
+            lock.acquire()
             cursor.execute(sql)
             self.db.commit()
+            lock.release()
             results = cursor.fetchall()
         except:
             return tuple()
@@ -391,7 +404,7 @@ class ATM_DEPOSIT_WORKER(object):
             user = user[2:]
         if tx_hash != None and tx_hash[:2] != '0x':
             print("transaction hash must be start with '0x'.")
-            return None
+            return list()
         if tx_hash == None or tx_hash == "":
             result = self.DBService.find_rows('DEPOSIT',"USER_ADDRESS = '{}'".format(user))
         else:
@@ -501,6 +514,16 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
 
     def query_atm_deposit_status(self,user,tx_hash):
         return self.atm_deposit_worker.deposit_status(user,tx_hash)
+
+        """执行离线交易"""
+    def send_raw_transaction(self,chain_name,signed_data):
+        _proxy = self._get_chain_proxy(chain_name)
+        transaction_hash = _proxy.sendRawTransaction(signed_data)
+        #过滤向homebridge转atm token的离线交易
+        if transaction_hash !='' and signed_data[76:84] == '09059cbb' and signed_data[108:148] == custom_contract_events.__contractInfo__['HomeBridge']['address']:
+            sql = custom_contract_events.ATM_Deposit1_insert_DBtable(transaction_hash)
+            self.atm_deposit_worker.DBService.insert_into_sql([sql])
+        return transaction_hash
 
     """
     def ATM_accounts_list(self): 
@@ -615,6 +638,8 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
                     contract_file=custom_contract_events.__contractInfo__['ATMToken']['file'], 
                     contract_address=unhexlify(custom_contract_events.__contractInfo__['ATMToken']['address']),)
 
+        if ERC20Token_ethereum == None:
+            return result
         temp = self.query_currency_balance(src_chain, account)
         result['ETH_balance'] = temp
 
