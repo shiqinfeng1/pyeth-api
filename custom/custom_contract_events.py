@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from ethereum.utils import normalize_address
 import time
+from binascii import hexlify
 """
 event返回数据的list元素结构举例:
 {
@@ -174,22 +175,22 @@ def ATM_Deposit2_insert_DBtable(event):
 
 def ATM_Deposit3_update_DBtable(event):
     sql = "UPDATE DEPOSIT SET STAGE = '%d', \
-        CHAIN_NAME_DEST = '%s', TRANSACTION_HASH_DEST = '%s', BLOCK_NUMBER_DEST = '%d',TIME_STAMP = '%s') \
+        CHAIN_NAME_DEST = '%s', TRANSACTION_HASH_DEST = '%s', BLOCK_NUMBER_DEST = '%d',TIME_STAMP = '%s' \
         WHERE TRANSACTION_HASH_SRC = '%s'" % \
-        (3, 'atmchain', event['transaction_hash'], event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), event['transactionHash'])
+        (3, 'atmchain', event['transaction_hash'], event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), '0x'+hexlify(event['transactionHash']))
 
     return sql
 
 __pollingEventSet__ = {
-    'ethereum_ATMToken_Transfer': {'filter_args':["69eb6e2b2dc66268482467b9b35369dc5c656cf0"],'stage':[ATM_Deposit2_update_DBtable,ATM_Deposit2_insert_DBtable]},
+    'ethereum_ATMToken_Transfer': {'filter_args':["c1aaac2d2739169d3d5dfe32e97be0678a7abf39"],'stage':[ATM_Deposit2_update_DBtable,ATM_Deposit2_insert_DBtable]},
     'atmchain_ForeignBridge_Deposit':{'filter_args':[],'stage':[ATM_Deposit3_update_DBtable]},
 }
 
 __contractInfo__ = {
-    'ContractAddress':{'file':'ContractAddress.sol','address':"de66acec6aa735d8407f57a5e5746e92777d9050"},
-    'ATMToken':{'file':'ATMToken.sol','address':"1343f98dcb7c867d553696d506cc87da995b75d2"},
-    'HomeBridge':{'file':'bridge.sol','address':"69eb6e2b2dc66268482467b9b35369dc5c656cf0"},
-    'ForeignBridge':{'file':'bridge.sol','address':"45d744d325160791941a7689f70ed841cf49207f"},
+    'ContractAddress':{'file':'ContractAddress.sol','address':"5f045e04d122a6d6c194fcdfbd6a2bcb24c1c343"},#de66acec6aa735d8407f57a5e5746e92777d9050
+    'ATMToken':{'file':'ATMToken.sol','address':"37a016410d9430696195eb07e8614d21873c8db1"},#1343f98dcb7c867d553696d506cc87da995b75d2
+    'HomeBridge':{'file':'bridge.sol','address':"c1aaac2d2739169d3d5dfe32e97be0678a7abf39"},#69eb6e2b2dc66268482467b9b35369dc5c656cf0
+    'ForeignBridge':{'file':'bridge.sol','address':"4947774318f05231bb896a69d175655017a783c3"},#45d744d325160791941a7689f70ed841cf49207f
 }
 
 __DBConfig__ = {

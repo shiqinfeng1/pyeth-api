@@ -178,7 +178,7 @@ def run(ctx, **kwargs):
             )
 
         """======创建链代理，并部署相关合约============"""
-        proxy1 = pyeth_api.new_blockchain_proxy("ethereum","118.31.71.12:21024",os.getcwd()+'/'+sys.argv[0]+'/keystore')
+        proxy1 = pyeth_api.new_blockchain_proxy("ethereum","kovan",os.getcwd()+'/'+sys.argv[0]+'/keystore')
         proxy2 = pyeth_api.new_blockchain_proxy("atmchain","118.31.71.12:21024",os.getcwd()+'/'+sys.argv[0]+'/keystore')
         
         account = pyeth_api.get_admin_account('atmchain')

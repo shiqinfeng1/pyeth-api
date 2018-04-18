@@ -3,24 +3,16 @@ from flask.json import jsonify
 from flask_restful import Api, abort
 from flask_cors import CORS
 from webargs.flaskparser import parser
-from pyethapp.jsonrpc import address_encoder
 from binascii import hexlify
-from api.v1.encoding import (
-    HexAddressConverter,
-)
 from api.v1.resources import (
     create_blueprint,
-    AddressResource,
+    DepositStatusResource,
     TokensResource,
+    RawTransactionResource,
+    NonceResource,
 )
 
 class APIServer(object):
-
-    # flask TypeConverter
-    # links argument-placeholder in route (e.g. '/<hexaddress: channel_address>') to the Converter
-    _type_converter_mapping = {
-        'hexaddress': HexAddressConverter
-    }
 
     def __init__(self, rest_api, cors_domain_list=None):
         self.rest_api = rest_api
@@ -38,34 +30,13 @@ class APIServer(object):
         if cors_domain_list:
             CORS(self.flask_app, origins=cors_domain_list)
         self._add_default_resources()
-        self._register_type_converters()
         self.flask_app.register_blueprint(self.blueprint)
 
     def _add_default_resources(self):
         self.add_resource(TokensResource, '/asset')
-        """
-        self.add_resource(ChannelsResource, '/channels')
-        self.add_resource(
-            ChannelsResourceByChannelAddress,
-            '/channels/<hexaddress:channel_address>'
-        )
-        self.add_resource(TokensResource, '/tokens')
-        self.add_resource(
-            PartnersResourceByTokenAddress,
-            '/tokens/<hexaddress:token_address>/partners'
-        )
-        self.add_resource(NetworkEventsResource, '/events/network')
-        """
-
-    def _register_type_converters(self, additional_mapping=None):
-        # an additional mapping concats to class-mapping and will overwrite existing keys
-        if additional_mapping:
-            mapping = dict(self._type_converter_mapping, **additional_mapping)
-        else:
-            mapping = self._type_converter_mapping
-
-        for key, value in mapping.items():
-            self.flask_app.url_map.converters[key] = value
+        self.add_resource(DepositStatusResource, '/QueryDepositStatus')
+        self.add_resource(RawTransactionResource, '/SendRawTransaction')
+        self.add_resource(NonceResource, '/QueryNonce')
 
     def add_resource(self, resource_cls, route):
         self.flask_api_context.add_resource(
@@ -91,7 +62,7 @@ class RestAPI(object):
     def __init__(self, pyeth_api):
         self.pyeth_api = pyeth_api
 
-    def deploy_contract(self,chain,user_address,decimals,total_suply,name,symbol):
+    def deploy_contract(self, chain, user_address, decimals, total_suply, name, symbol):
         ethereum_proxy = self.pyeth_api._get_chain_proxy(chain)
         userToken = ethereum_proxy.deploy_contract( 
             ethereum_proxy.account_manager.admin_account, 
@@ -102,3 +73,15 @@ class RestAPI(object):
         address = userToken.address
         print("deployed address:", hexlify(address))
         return {'contract_address': hexlify(address)}
+
+    def query_atm_deposit_status(self, user_address, transaction_hash):
+        result = self.pyeth_api.query_atm_deposit_status(user_address, transaction_hash)
+        return {'atm_deposit_status': result}
+    
+    def send_raw_transaction(self, chain_name,signed_data):
+        result = self.pyeth_api.send_raw_transaction(chain_name,signed_data)
+        return {'transaction_hash': '0x'+result}
+
+    def query_nonce(self, chain_name,user):
+        result = self.pyeth_api.get_nonce(chain_name,user)
+        return {'nonoce': result}

@@ -124,6 +124,17 @@ class ATMChainTools(object):
             return
         self.pyeth_api.transfer_token("ethereum",contract_address,sender,to,amount,False)
 
+    def send_raw_transaction(self,chain_name,signed_data):
+        self.pyeth_api.send_raw_transaction(chain_name,signed_data)
+
+    def deposit_atm_manual(self,id):
+        self.pyeth_api.deposit_atm_manual(id)
+
+    def query_deposit_progress(self,user=None,tx_hash=None):
+        result = self.pyeth_api.query_deposit_progress(user,tx_hash)
+        for record in result:
+            print(record)
+
 class AppTwitterTools(object):
     def __init__(self, chain):
         self.chain = chain

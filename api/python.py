@@ -17,7 +17,6 @@ from service.accounts_manager import Account,find_keystoredir
 from ethereum.utils import encode_hex
 import custom.custom_contract_events as custom_contract_events
 
-#admin_account = '5252781539b365e08015fa7ed77af5a36097f39d'
 
 class PYETHAPI(object):
     """ CLI interface. """
@@ -127,6 +126,17 @@ class PYETHAPI(object):
         _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Transfer',to)
         _proxy.account_manager.get_account(sender,password).lock()
 
+    """执行离线交易"""
+    def send_raw_transaction(self,chain_name,signed_data):
+        _proxy = self._get_chain_proxy(chain_name)
+        transaction_hash = _proxy.sendRawTransaction(signed_data)
+        return transaction_hash
+
+    def get_nonce(self,chain_name,user):
+        _proxy = self._get_chain_proxy(chain_name)
+        nonce = _proxy.nonce(user)
+        return nonce
+
 class DBService(object):
 
     def __init__(self):
@@ -193,8 +203,11 @@ class DBService(object):
         if self.is_table_exist(custom_contract_events.__DBConfig__['db'], 'DEPOSIT') == False:
             return
 
+        result = self.find_rows('DEPOSIT',"STAGE = '3' AND TRANSACTION_HASH_DEST = '{}'".format(tx_hash))
+        if len(result)>0:
+            return
         sql = sql_sets[0](*args)
-
+        print('DEPOSIT EXEC SQL: {}'.format(sql))
         self.insert_into_sql([sql])
 
     def connect(self):
@@ -339,7 +352,7 @@ class ATM_DEPOSIT_WORKER(object):
                     self.deposit(record[1], record[2], record[5])
 
     def deposit(self, recipient, value, tx_hash_src):
-        value = value * (10**8)
+        value = value * (10**10)
         print("deposit {} to {} for transaction_hash:{}".format(value, recipient, tx_hash_src))
         _proxy = self.current_blockchain_proxy['atmchain']
         admin_account = _proxy.account_manager.get_admin_account()
@@ -354,12 +367,24 @@ class ATM_DEPOSIT_WORKER(object):
         _proxy.poll_contarct_transaction_result(txhash)
 
     def deposit_manual(self,id):
-        result = self.DBService.find_rows('DEPOSIT',"STAGE = '2' AND CHAIN_NAME_DEST = 'atmchain' AND ID < {}".format(id))
+        result = self.DBService.find_rows('DEPOSIT',"STAGE = '2' AND CHAIN_NAME_DEST = 'atmchain' AND ID < '{}'".format(id))
         if result == None or result == tuple():
             return
         else:
             for record in result:
                 self.deposit(record[1], record[2], record[5])
+
+    def deposit_status(self,user,tx_hash):
+        if user[:2] == '0x':
+            user = user[2:]
+        if tx_hash != None and tx_hash[:2] != '0x':
+            print("transaction hash must be start with '0x'.")
+            return None
+        if tx_hash == None or tx_hash == "":
+            result = self.DBService.find_rows('DEPOSIT',"USER_ADDRESS = '{}'".format(user))
+        else:
+            result = self.DBService.find_rows('DEPOSIT',"TRANSACTION_HASH_SRC = '{}'".format(tx_hash))
+        return result
 
     def stop(self):
         self.is_stopped = True
@@ -373,13 +398,14 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
         self.polling_events_contract_proxy_cache = dict()
 
         self.polling_delay = 3
-        self.polled_blocknumber = 0
+        self.polled_blocknumber = dict()
         self.is_stopped = False
         self.DBService = DBService()
 
     def add_new_chain(self,chain_name,_proxy):
         self.current_connected_chain.append(chain_name)
         self.current_blockchain_proxy[chain_name] = _proxy
+        self.polled_blocknumber[chain_name] = 0
 
     def update_polling_event(self):
         reload(custom_contract_events)
@@ -418,23 +444,19 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
 
                     for event_name in self.polling_events[chain_name][contract_name] :
                         event_key, events = contract_proxy.poll_contract_event(
-                            self.polled_blocknumber,
+                            self.polled_blocknumber[chain_name],
                             event_name,
                             0,False,
                             *self.polling_events[chain_name][contract_name][event_name]["filter_args"]
                         )
                         if events == list():
-                            if event_name=='Deposit':
-                                print("step idle",chain_name,contract_name,event_name)
                             continue
                         for event in events:
-                            if event_name=='Deposit':
-                                print("event_name=='Deposit':",event)
                             DBcallback = self.DBService.polling_events_callback[chain_name + '_' + contract_name + '_' + event_name]
                             sql_sets = self.polling_events[chain_name][contract_name][event_name]['stage']
                             DBcallback(sql_sets,event['transaction_hash'],(event))
                         
-                self.polled_blocknumber = polling_current_blocknumber
+                self.polled_blocknumber[chain_name] = polling_current_blocknumber
 
     def stop(self):
         self.is_stopped = True
@@ -464,6 +486,9 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
 
     def deposit_atm_manual(self,id):
         self.atm_deposit_worker.deposit_manual(id)
+
+    def query_atm_deposit_status(self,user,tx_hash):
+        return self.atm_deposit_worker.deposit_status(user,tx_hash)
 
     """
     def ATM_accounts_list(self): 

@@ -5,6 +5,9 @@ from flask_restful import Resource
 from flask import Blueprint
 from api.v1.encoding import (
     TokenSchema,
+    DepositStatusSchema,
+    RawTransactionSchema,
+    NonceSchema,
 )
 
 def create_blueprint():
@@ -37,29 +40,41 @@ class TokensResource(BaseResource):
             symbol=symbol,
         )
 
-class AddressResource(BaseResource):
-
-    def __init__(self, **kwargs):
-        super(AddressResource, self).__init__(**kwargs)
-
-    def get(self):
-        return self.rest_api.get_admin_address()
-"""
-class TransferToTargetResource(BaseResource):
+class DepositStatusResource(BaseResource):
     
-    post_schema = TransferSchema(
-        exclude=('initiator_address', 'target_address', 'token_address')
-    )
+    post_schema = DepositStatusSchema()
 
     def __init__(self, **kwargs):
-        super(TransferToTargetResource, self).__init__(**kwargs)
+        super(DepositStatusResource, self).__init__(**kwargs)
 
     @use_kwargs(post_schema, locations=('json',))
-    def post(self, token_address, target_address, amount, identifier):
-        return self.rest_api.initiate_transfer(
-            token_address=token_address,
-            target_address=target_address,
-            amount=amount,
-            identifier=identifier,
+    def post(self, user_address,transaction_hash):
+        return self.rest_api.query_atm_deposit_status(
+            user_address,transaction_hash
         )
-"""
+
+class RawTransactionResource(BaseResource):
+    
+    post_schema = RawTransactionSchema()
+
+    def __init__(self, **kwargs):
+        super(RawTransactionResource, self).__init__(**kwargs)
+
+    @use_kwargs(post_schema, locations=('json',))
+    def post(self, chain_name,signed_data):
+        return self.rest_api.send_raw_transaction(
+            chain_name,signed_data
+        )
+
+class NonceResource(BaseResource):
+    
+    post_schema = NonceSchema()
+
+    def __init__(self, **kwargs):
+        super(NonceResource, self).__init__(**kwargs)
+
+    @use_kwargs(post_schema, locations=('json',))
+    def post(self, chain_name,user):
+        return self.rest_api.query_nonce(
+            chain_name,user
+        )

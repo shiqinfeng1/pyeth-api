@@ -15,7 +15,7 @@ from ethereum.utils import encode_hex, normalize_address
 from pyethapp.jsonrpc import (
     data_encoder,
 )
-
+from pyethapp.rpc_client import deploy_dependencies_symbols, dependencies_order_of_build
 from service.utils import (
     split_endpoint,
 )
@@ -178,7 +178,7 @@ class BlockChainProxy(object):
         if endpoint in ['mainnet', 'ropsten', 'kovan', 'rinkeby']:
             self.third_party_endpoint  = 'https://'+endpoint+'.infura.io/SaTkK9e9TKrRuhHg'
             self.jsonrpc_client_without_sender = JSONRPCClient_for_infura(
-                self.endpoint,
+                self.third_party_endpoint,
                 '',
             )
         else:
@@ -395,6 +395,19 @@ class BlockChainProxy(object):
         """ Return the balance of the account of given address. """
         res = self.jsonrpc_client_without_sender.call('eth_getBalance', address_encoder(account), 'latest')
         return quantity_decoder(res)
+    
+    def nonce(self, account):
+        """ Return the nonce of the account of given address. """
+        res = self.jsonrpc_client_without_sender.nonce(account)
+        return res
+
+    def sendRawTransaction(self, tx_data):
+        """ execute offline transaction. """
+        result = self.jsonrpc_client_without_sender.call(
+                'eth_sendRawTransaction',
+                tx_data # data_encoder(tx_data.decode('hex')), # data_encoder(rlp.encode(tx_data)),  #
+            )
+        return result[2 if result.startswith('0x') else 0:]
 
 class JSONRPCClient(object):
     """ Ethereum JSON RPC client.
@@ -1125,7 +1138,7 @@ class JSONRPCClient_for_infura(JSONRPCClient):
         
         if privkey != '':
             self.sender = privatekey_to_address(privkey)
-            print('temp: sender={}'.format(hexlify(self.sender)))
+            #print('temp: sender={}'.format(hexlify(self.sender)))
         else:
             self.sender = ''
         self.nonce_last_update = 0
@@ -1149,8 +1162,8 @@ class JSONRPCClient_for_infura(JSONRPCClient):
         resp = requests.post(self.endpoint, data=json.dumps(payload))
         result = json.loads(resp.text)
         if 'result' in result.keys():
-            print("POST \nmethod:{} \nresult:{} ".format(payload['method'],result['result']))
+            #print("POST \nmethod:{} \nresult:{} ".format(payload['method'],result['result']))
             return result['result']
         else:
-            print("POST \nmethod:{} \nerror:{} ".format(payload['method'],result['error']))
+            #print("POST \nmethod:{} \nerror:{} ".format(payload['method'],result['error']))
             return None

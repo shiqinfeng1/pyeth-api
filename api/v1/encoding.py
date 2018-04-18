@@ -8,6 +8,10 @@ from marshmallow import (
     Schema,
     SchemaOpts,
 )
+from service.utils import (
+    address_encoder,
+    address_decoder,
+)
 from werkzeug.routing import (
     BaseConverter,
     ValidationError,
@@ -51,18 +55,34 @@ class BaseSchema(Schema):
     def make_object(self, data):
         # this will depend on the Schema used, which has its object class in
         # the class Meta attributes
+        #print('data....',data)
         decoding_class = self.opts.decoding_class
         return decoding_class(**data)
 
-class ChainSchema(BaseSchema):
-    token_address = AddressField(missing=None)
-    amount = fields.String(required=True)
-    identifier = fields.Integer(missing=None)
+class DepositStatusSchema(BaseSchema):
+    user_address = fields.String(missing=None)
+    transaction_hash = fields.String(missing=None)
 
     class Meta:
         strict = True
         decoding_class = dict
-        
+
+class RawTransactionSchema(BaseSchema):
+    chain_name = fields.String(missing=None)
+    signed_data = fields.String(missing=None)
+
+    class Meta:
+        strict = True
+        decoding_class = dict
+
+class NonceSchema(BaseSchema):
+    chain_name = fields.String(missing=None)
+    user = fields.String(missing=None)
+
+    class Meta:
+        strict = True
+        decoding_class = dict
+
 class TokenSchema(BaseSchema):
     chain_name = fields.String(missing=None)
     user_address = AddressField(missing=None)
@@ -74,21 +94,3 @@ class TokenSchema(BaseSchema):
     class Meta:
         strict = True
         decoding_class = dict
-
-class HexAddressConverter(BaseConverter):
-    def to_python(self, value):
-        if value[:2] != '0x':
-            raise ValidationError()
-
-        try:
-            value = value[2:].decode('hex')
-        except TypeError:
-            raise ValidationError()
-
-        if len(value) != 20:
-            raise ValidationError()
-
-        return value
-
-    def to_url(self, value):
-        return address_encoder(value)
