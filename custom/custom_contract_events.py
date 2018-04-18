@@ -201,6 +201,8 @@ __DBConfig__ = {
     'db':"atm_bridge",
     'charset':"utf8",
 }
-
+__BridgeConfig__ = {
+    'limit':10000*(10**8)
+}
     
 

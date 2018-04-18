@@ -133,6 +133,18 @@ class PYETHAPI(object):
         return transaction_hash
 
     def get_nonce(self,chain_name,user):
+        if chain_name == None or chain_name=='':
+            chain_name = 'ethereum'
+        _proxy = self._get_chain_proxy(chain_name)
+        nonce = _proxy.nonce(user)
+        return nonce
+
+    def get_deposit_limit(self):
+        return custom_contract_events.__BridgeConfig__['limit']
+
+    def get_balance(self,chain_name,user):
+        if chain_name ==None or chain_name=='':
+            chain_name = 'ethereum'
         _proxy = self._get_chain_proxy(chain_name)
         nonce = _proxy.nonce(user)
         return nonce
@@ -589,8 +601,8 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
         _proxy = self._get_chain_proxy(chain_name)
 
         temp = _proxy.balance(address_decoder(account))
-        result = float(temp)/constant.WEI_TO_ETH
-        return result
+        
+        return temp
 
     def query_atmchain_balance(self,src_chain,dest_chain,account):
 
@@ -604,13 +616,12 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
                     contract_address=unhexlify(custom_contract_events.__contractInfo__['ATMToken']['address']),)
 
         temp = self.query_currency_balance(src_chain, account)
-        result['ETH balance'] = temp
+        result['ETH_balance'] = temp
 
         temp = ERC20Token_ethereum.balanceOf(account) if ERC20Token_ethereum != None else 0
-        result['ATM balance in ethereum({})'.format(custom_contract_events.__contractInfo__['ATMToken']['address'])] = float(temp)/constant.ATM_DECIMALS 
+        result['ATM_balance_ethereum'] = temp
     
         temp = self.query_currency_balance(dest_chain, account)
-        result['ATM balance in atmchain'] = temp
-        
+        result['ATM_balance_atmchain'] = temp
     
         return result

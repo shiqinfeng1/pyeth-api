@@ -10,6 +10,8 @@ from api.v1.resources import (
     TokensResource,
     RawTransactionResource,
     NonceResource,
+    DepositLimitResource,
+    BalanceResource,
 )
 
 class APIServer(object):
@@ -37,6 +39,8 @@ class APIServer(object):
         self.add_resource(DepositStatusResource, '/QueryDepositStatus')
         self.add_resource(RawTransactionResource, '/SendRawTransaction')
         self.add_resource(NonceResource, '/QueryNonce')
+        self.add_resource(DepositLimitResource, '/QueryDepositLimit')
+        self.add_resource(BalanceResource, '/QueryBalance')
 
     def add_resource(self, resource_cls, route):
         self.flask_api_context.add_resource(
@@ -84,4 +88,12 @@ class RestAPI(object):
 
     def query_nonce(self, chain_name,user):
         result = self.pyeth_api.get_nonce(chain_name,user)
-        return {'nonoce': result}
+        return {'nonce': result}
+
+    def query_deposit_limit(self):
+        result = self.pyeth_api.get_deposit_limit()
+        return {'deposit_limit': result}
+    
+    def query_balance(self,user):
+        result = self.pyeth_api.query_atmchain_balance('ethereum','atmchain',user)
+        return {'balance': result}

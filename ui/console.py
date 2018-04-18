@@ -23,6 +23,7 @@ from binascii import hexlify, unhexlify
 from service.utils import (
     split_endpoint
 )
+from service import constant
 import custom.custom_contract_events as custom_contract_events
 # ipython needs to accept "--gui gevent" option
 IPython.core.shellapp.InteractiveShellApp.gui.values += ('gevent',)
@@ -64,14 +65,23 @@ class ATMChainTools(object):
 
     def query_currency_balance(self,chain_name,account):
         result = self.pyeth_api.query_currency_balance(chain_name,account)
+        result = float(result)/constant.WEI_TO_ETH
         print('------------------------------------')
         print('{:<30}: {:,}'.format(account, result))
     
     def query_atmchain_balance(self,account):
         result = self.pyeth_api.query_atmchain_balance('ethereum','atmchain',account)
+        res = dict()
+
+        res['ETH balance'] = float(result['ETH_balance'])/constant.WEI_TO_ETH
+
+        res['ATM balance in ethereum({})'.format(custom_contract_events.__contractInfo__['ATMToken']['address'])] = float(result['ATM_balance_ethereum'])/constant.ATM_DECIMALS 
+    
+        res['ATM balance in atmchain'] = float(result['ATM_balance_atmchain'])/constant.WEI_TO_ETH
+
         print('------------------------------------')
-        for key in sorted(result.keys()):
-            print('{:<30}: {:,}'.format(key, result[key]))
+        for key in sorted(res.keys()):
+            print('{:<30}: {:,}'.format(key, res[key]))
 
     def new_account(self,chain_name, key=None):
         assert isinstance(key,str) and len(key)==64

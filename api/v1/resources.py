@@ -8,6 +8,8 @@ from api.v1.encoding import (
     DepositStatusSchema,
     RawTransactionSchema,
     NonceSchema,
+    BalanceSchema,
+    DepositLimitSchema,
 )
 
 def create_blueprint():
@@ -78,3 +80,25 @@ class NonceResource(BaseResource):
         return self.rest_api.query_nonce(
             chain_name,user
         )
+
+class DepositLimitResource(BaseResource):
+    
+    post_schema = DepositLimitSchema()
+
+    def __init__(self, **kwargs):
+        super(DepositLimitResource, self).__init__(**kwargs)
+
+    @use_kwargs(post_schema, locations=('json',))
+    def post(self):
+        return self.rest_api.query_deposit_limit()
+
+class BalanceResource(BaseResource):
+    
+    post_schema = BalanceSchema()
+
+    def __init__(self, **kwargs):
+        super(BalanceResource, self).__init__(**kwargs)
+
+    @use_kwargs(post_schema, locations=('json',))
+    def post(self,user):
+        return self.rest_api.query_balance(user)

@@ -83,6 +83,17 @@ class NonceSchema(BaseSchema):
         strict = True
         decoding_class = dict
 
+class BalanceSchema(BaseSchema):
+    user = fields.String(missing=None)
+    class Meta:
+        strict = True
+        decoding_class = dict
+
+class DepositLimitSchema(BaseSchema):
+    class Meta:
+        strict = True
+        decoding_class = dict
+
 class TokenSchema(BaseSchema):
     chain_name = fields.String(missing=None)
     user_address = AddressField(missing=None)

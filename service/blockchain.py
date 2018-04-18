@@ -398,6 +398,8 @@ class BlockChainProxy(object):
     
     def nonce(self, account):
         """ Return the nonce of the account of given address. """
+        if account[:2]=='0x':
+            account = account[2:]
         res = self.jsonrpc_client_without_sender.nonce(account)
         return res
 
