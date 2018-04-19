@@ -1,3 +1,5 @@
+import ./ATMToken.sol
+
 pragma solidity ^0.4.14;
 
 /*
@@ -146,6 +148,7 @@ library Message {
 }
 
 */
+
 contract HomeBridge {
     /// Number of authorities signatures required to withdraw the money.
     ///
@@ -154,8 +157,15 @@ contract HomeBridge {
     address[] public authorities;
 
     /// Used foreign transaction hashes.
-    mapping (bytes32 => bool) withdraws;
+    mapping (bytes32 => address[]) withdraws;
+    event WithdrawConfirmation(address recipient, uint256 value, bytes32 transactionHash);
+    event Withdraw(address recipient, uint256 value, bytes32 transactionHash);
 
+        /// require that sender is an authority
+    modifier onlyAuthority() {
+        require(addressArrayContains(authorities, msg.sender));
+        _;
+    }
     /// Constructor.
     function HomeBridge(
         uint256 requiredSignaturesParam,
@@ -167,8 +177,37 @@ contract HomeBridge {
         requiredSignatures = requiredSignaturesParam;
         authorities = authoritiesParam;
     }
-    function withdraw(address recipient, uint256 value, bytes32 transactionHash){
+    function addressArrayContains(address[] array, address value) internal returns (bool) {
+        for (uint256 i = 0; i < array.length; i++) {
+            if (array[i] == value) {
+                return true;
+            }
+        }
+        return false;
+    }
+    function withdraw(address token_address, address recipient, uint256 value, bytes32 transactionHash) public onlyAuthority(){
+        
+        ATMToken token = ATMToken(token_address);
+        require(token.balanceOf(address(this)) > value);
+        
+        // Protection from misbehaving authority
+        bytes32 hash = keccak256(recipient, value, transactionHash);
 
+        // don't allow authority to confirm deposit twice
+        if (addressArrayContains(withdraws[hash], msg.sender) == true){
+            return;
+        }
+
+        withdraws[hash].push(msg.sender);
+
+        // TODO: this may cause troubles if requiredSignatures len is changed
+        if (withdraws[hash].length != requiredSignatures) {
+            WithdrawConfirmation(recipient, value, transactionHash);
+            return;
+        }
+
+        token.transfer(recipient,value);
+        Withdraw(recipient, value, transactionHash);
     }
 }
 
