@@ -96,7 +96,25 @@ OPTIONS = [
         help=(
             'Start with specified business.'
         ),
-        default='atmchain',
+        default='atmchain', #atmchain_rewards_plan
+        type=str,
+        show_default=True,
+    ),
+    click.option(
+        '--admin',
+        help=(
+            'admin account of chain.'
+        ),
+        default=None,
+        type=str,
+        show_default=True,
+    ),
+    click.option(
+        '--password',
+        help=(
+            'password of admin account.'
+        ),
+        default=None,
         type=str,
         show_default=True,
     ),
@@ -116,7 +134,9 @@ def app(gas_price,
         rpcaddress,
         rpc,
         console,
-        inst):
+        inst,
+        admin,
+        password):
 
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements,unused-argument
 
@@ -177,38 +197,47 @@ def run(ctx, **kwargs):
                 )
             )
 
+        admin_account = str(kwargs['admin'])
         """======创建链代理，并部署相关合约============"""
-        proxy1 = pyeth_api.new_blockchain_proxy("ethereum","kovan",os.getcwd()+'/'+sys.argv[0]+'/keystore')
-        proxy2 = pyeth_api.new_blockchain_proxy("atmchain","118.31.71.12:21024",os.getcwd()+'/'+sys.argv[0]+'/keystore')
+        proxy1 = pyeth_api.new_blockchain_proxy("ethereum","kovan",os.getcwd()+'/'+sys.argv[0]+'/keystore',admin_account)
+        proxy2 = pyeth_api.new_blockchain_proxy("atmchain","118.31.71.12:21024",os.getcwd()+'/'+sys.argv[0]+'/keystore',admin_account)
         
-        account = pyeth_api.get_admin_account('atmchain')
-        admin_password = click.prompt('Enter the password to unlock %s' % account, default='', hide_input=True,
+        admin_password = str(kwargs['password'])
+        if admin_password ==None:
+            admin_password = click.prompt('Enter the password to unlock admin account %s' % admin_account, default='', hide_input=True,
                                 confirmation_prompt=False, show_default=False)
-        pyeth_api.set_admin_password('atmchain',admin_password)
+
+        account_atmchain = pyeth_api.get_admin_account('atmchain')
+        admin_password_atmchain =admin_password
+        pyeth_api.set_admin_password('atmchain',admin_password_atmchain)
+
+        account_ethereum = pyeth_api.get_admin_account('ethereum')
+        admin_password_ethereum = admin_password
+        pyeth_api.set_admin_password('ethereum',admin_password_ethereum)
 
         ContractAddress = custom_contract_events.__contractInfo__['ContractAddress']['address']
 
         if ContractAddress == "":
             ContractAddress_proxy = proxy2.deploy_contract( 
-                account,
+                account_atmchain,
                 custom_contract_events.__contractInfo__['ContractAddress']['file'], 'ContractAddress',
-                password=admin_password,
+                password=admin_password_atmchain,
             )
         else:
             ContractAddress_proxy = proxy2.attach_contract(
                 'ContractAddress',
                 contract_file = custom_contract_events.__contractInfo__['ContractAddress']['file'],
                 contract_address = unhexlify(ContractAddress), #ContractAddress.address, 
-                attacher = account,
-                password=admin_password,
+                attacher = account_atmchain,
+                password=admin_password_atmchain,
             )
         
         if custom_contract_events.__contractInfo__['ForeignBridge']['address'] == "":
             foreignbridge_proxy = proxy2.deploy_contract( 
-                account,
+                account_atmchain,
                 custom_contract_events.__contractInfo__['ForeignBridge']['file'], 'ForeignBridge',
-                (1,[account]),
-                password=admin_password
+                (1,[account_atmchain]),
+                password=admin_password_atmchain
                 )
             txhash = ContractAddress_proxy.set_foreigin_bridge('0x'+hexlify(foreignbridge_proxy.address))
             result, txhash = proxy2.poll_contarct_transaction_result(txhash) 
@@ -219,9 +248,9 @@ def run(ctx, **kwargs):
         
         if custom_contract_events.__contractInfo__['ATMToken']['address'] == "":
             ATMToken_proxy = proxy1.deploy_contract( 
-                account,
+                account_ethereum,
                 custom_contract_events.__contractInfo__['ATMToken']['file'], 'ATMToken',
-                password=admin_password
+                password=admin_password_ethereum
                 )
             txhash = ContractAddress_proxy.set_atm_token('0x'+hexlify(ATMToken_proxy.address))
             result, txhash = proxy1.poll_contarct_transaction_result(txhash) 
@@ -232,10 +261,10 @@ def run(ctx, **kwargs):
         
         if custom_contract_events.__contractInfo__['HomeBridge']['address'] == "":
             ATMToken_proxy = proxy1.deploy_contract( 
-                account,
+                account_ethereum,
                 custom_contract_events.__contractInfo__['HomeBridge']['file'], 'HomeBridge',
-                (1,[account]),
-                password=admin_password
+                (1,[account_ethereum]),
+                password=admin_password_ethereum
                 )
             txhash = ContractAddress_proxy.set_home_bridge('0x'+hexlify(ATMToken_proxy.address))
             result, txhash = proxy1.poll_contarct_transaction_result(txhash) 

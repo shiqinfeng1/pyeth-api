@@ -295,6 +295,6 @@ contract ForeignBridge {
     function () public payable {
         require(msg.value > 10**10);
         uint value = msg.value / 10**10;
-        Transfer(msg.sender,value);
+        TransferBack(msg.sender,value);
     }
 }

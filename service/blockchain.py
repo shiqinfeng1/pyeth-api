@@ -139,12 +139,14 @@ class BlockChainService(object):
     def new_blockchain_proxy(self,
             chain_name,
             endpoint,
-            keystore_path):
+            keystore_path,
+            admin_account=None):
         
         self.blockchain_proxy[chain_name] = BlockChainProxy(
             chain_name,
             endpoint,
-            keystore_path)
+            keystore_path,
+            admin_account)
         if self.blockchain_proxy[chain_name] == None:
             raise RuntimeError('create BlockChainProxy fail.')
 
@@ -164,13 +166,14 @@ class BlockChainProxy(object):
             self,
             chain_name,
             endpoint,
-            keystore_path):
+            keystore_path,
+            admin_account=None):
             
         self.chain_name = chain_name
         self.local_contract_proxys =  dict()
         self.remote_contract_proxys =  dict()
         self.jsonrpc_proxys =  dict()
-        self.account_manager = accounts_manager.AccountManager(keystore_path)
+        self.account_manager = accounts_manager.AccountManager(keystore_path,admin_account)
         self.third_party_endpoint = None
         self.host = None
         self.port = None

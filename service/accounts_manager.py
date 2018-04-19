@@ -239,7 +239,7 @@ class Account(object):
 
 class AccountManager(object):
    
-    def __init__(self, keystore_path=None):
+    def __init__(self, keystore_path=None,admin_account=None):
         self.keystore_path = keystore_path
         self.accounts = {}
         self.admin_password = 0
@@ -263,7 +263,9 @@ class AccountManager(object):
                                 msg = 'Can not read account file'
                             log.warning('%s %s: %s', msg, fullpath, ex)
 
-        if len(self.accounts):
+        if admin_account != None:
+            self.admin_account = admin_account
+        elif len(self.accounts):
             self.admin_account = '0x'+self.accounts.keys()[0]
         else:
             self.admin_account = None
@@ -280,7 +282,7 @@ class AccountManager(object):
         
         password = click.prompt('Enter the password to unlock %s' % old_address, default='', hide_input=True,
                                 confirmation_prompt=False, show_default=False)
-        acc = Account.load(self.keystore_path,password)
+        acc = Account.load(self.keystore_path+old_address,password)
         if acc.locked == False:
             self.admin_account = address
             acc.lock()

@@ -120,13 +120,19 @@ def ForeignBridge_Deposit_filter_condition():
         return True
     return filter
 
-def ForeignBridge_Withdraw_filter_condition():
+def ForeignBridge_TransferBack_filter_condition():
+    def filter(event):
+        if event['_event_type'] != 'TransferBack':
+            return False
+        return True
+    return filter
+
+def HomeBridge_Withdraw_filter_condition():
     def filter(event):
         if event['_event_type'] != 'Withdraw':
             return False
         return True
     return filter
-
 
 __conditionSet__ = {
     'ATMToken_Transfer': Token_Transfer_filter_condition,
@@ -144,7 +150,8 @@ __conditionSet__ = {
     'TwitterAccount_Log_lotus': TwitterAccount_Log_lotus_filter_condition,
 
     'ForeignBridge_Deposit': ForeignBridge_Deposit_filter_condition,
-    'ForeignBridge_Withdraw': ForeignBridge_Withdraw_filter_condition,
+    'ForeignBridge_TransferBack': ForeignBridge_TransferBack_filter_condition,
+    'HomeBridge_Withdraw': HomeBridge_Withdraw_filter_condition,
 }
 
 
@@ -154,14 +161,26 @@ def ATM_Deposit1_insert_DBtable(tx_hash):
         CHAIN_NAME_DEST, TRANSACTION_HASH_DEST, BLOCK_NUMBER_DEST,TIME_STAMP) \
         VALUES ('%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s')" % \
         ('unknow', 0, 1, 'ethereum', tx_hash, 0, 'unknow', 'unknow', 0,time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
+    return sql
 
+def ATM_Withdraw1_insert_DBtable(tx_hash):
+    sql = "INSERT INTO WITHDRAW(USER_ADDRESS, AMOUNT, STAGE, \
+        CHAIN_NAME_SRC, TRANSACTION_HASH_SRC, BLOCK_NUMBER_SRC, \
+        CHAIN_NAME_DEST, TRANSACTION_HASH_DEST, BLOCK_NUMBER_DEST,TIME_STAMP) \
+        VALUES ('%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s')" % \
+        ('unknow', 0, 1, 'atmchain', tx_hash, 0, 'unknow', 'unknow', 0,time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
     return sql
 
 def ATM_Deposit2_update_DBtable(event):
     sql = "UPDATE DEPOSIT SET USER_ADDRESS = '%s', STAGE = '%d', BLOCK_NUMBER_SRC = '%d', AMOUNT = '%d', TIME_STAMP = '%s' \
         WHERE TRANSACTION_HASH_SRC = '%s'" % \
         (event['_from'], 2, event['block_number'],event['_value'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), event['transaction_hash'])
+    return sql
 
+def ATM_Withdraw2_update_DBtable(event):
+    sql = "UPDATE WITHDRAW SET USER_ADDRESS = '%s', STAGE = '%d', BLOCK_NUMBER_SRC = '%d', AMOUNT = '%d', TIME_STAMP = '%s' \
+        WHERE TRANSACTION_HASH_SRC = '%s'" % \
+        (event['_from'], 2, event['block_number'],event['_value'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), event['transaction_hash'])
     return sql
 
 def ATM_Deposit2_insert_DBtable(event):
@@ -170,7 +189,14 @@ def ATM_Deposit2_insert_DBtable(event):
         CHAIN_NAME_DEST, TRANSACTION_HASH_DEST, BLOCK_NUMBER_DEST,TIME_STAMP) \
         VALUES ('%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s')" % \
         (event['_from'], event['_value'], 2, 'ethereum', event['transaction_hash'], event['block_number'], '', '', 0,time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
+    return sql
 
+def ATM_Withdraw2_insert_DBtable(event):
+    sql = "INSERT INTO WITHDRAW(USER_ADDRESS, AMOUNT, STAGE, \
+        CHAIN_NAME_SRC, TRANSACTION_HASH_SRC, BLOCK_NUMBER_SRC, \
+        CHAIN_NAME_DEST, TRANSACTION_HASH_DEST, BLOCK_NUMBER_DEST,TIME_STAMP) \
+        VALUES ('%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s')" % \
+        (event['_from'], event['_value'], 2, 'atmchain', event['transaction_hash'], event['block_number'], '', '', 0,time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
     return sql
 
 def ATM_Deposit3_update_DBtable(event):
@@ -178,20 +204,29 @@ def ATM_Deposit3_update_DBtable(event):
         CHAIN_NAME_DEST = '%s', TRANSACTION_HASH_DEST = '%s', BLOCK_NUMBER_DEST = '%d',TIME_STAMP = '%s' \
         WHERE TRANSACTION_HASH_SRC = '%s'" % \
         (3, 'atmchain', event['transaction_hash'], event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), '0x'+hexlify(event['transactionHash']))
-
     return sql
 
-__pollingEventSet__ = {
-    'ethereum_ATMToken_Transfer': {'filter_args':["c1aaac2d2739169d3d5dfe32e97be0678a7abf39"],'stage':[ATM_Deposit2_update_DBtable,ATM_Deposit2_insert_DBtable]},
-    'atmchain_ForeignBridge_Deposit':{'filter_args':[],'stage':[ATM_Deposit3_update_DBtable]},
-}
+def ATM_Withdraw3_update_DBtable(event):
+    sql = "UPDATE WITHDRAW SET STAGE = '%d', \
+        CHAIN_NAME_DEST = '%s', TRANSACTION_HASH_DEST = '%s', BLOCK_NUMBER_DEST = '%d',TIME_STAMP = '%s' \
+        WHERE TRANSACTION_HASH_SRC = '%s'" % \
+        (3, 'ethereum', event['transaction_hash'], event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), '0x'+hexlify(event['transactionHash']))
+    return sql
 
 __contractInfo__ = {
-    'ContractAddress':{'file':'ContractAddress.sol','address':"5f045e04d122a6d6c194fcdfbd6a2bcb24c1c343"},#de66acec6aa735d8407f57a5e5746e92777d9050
-    'ATMToken':{'file':'ATMToken.sol','address':"37a016410d9430696195eb07e8614d21873c8db1"},#1343f98dcb7c867d553696d506cc87da995b75d2
-    'HomeBridge':{'file':'bridge.sol','address':"c1aaac2d2739169d3d5dfe32e97be0678a7abf39"},#69eb6e2b2dc66268482467b9b35369dc5c656cf0
-    'ForeignBridge':{'file':'bridge.sol','address':"4947774318f05231bb896a69d175655017a783c3"},#45d744d325160791941a7689f70ed841cf49207f
+    'ContractAddress':{'file':'ContractAddress.sol','address':"5f045e04d122a6d6c194fcdfbd6a2bcb24c1c343"},
+    'ATMToken':{'file':'ATMToken.sol','address':"37a016410d9430696195eb07e8614d21873c8db1"},
+    'HomeBridge':{'file':'bridge.sol','address':"c1aaac2d2739169d3d5dfe32e97be0678a7abf39"},
+    'ForeignBridge':{'file':'bridge.sol','address':"4947774318f05231bb896a69d175655017a783c3"},
 }
+
+__pollingEventSet__ = {
+    'ethereum_ATMToken_Transfer': {'filter_args':[__contractInfo__['HomeBridge']['address']],'stage':[ATM_Deposit2_update_DBtable,ATM_Deposit2_insert_DBtable]},
+    'atmchain_ForeignBridge_Deposit':{'filter_args':[],'stage':[ATM_Deposit3_update_DBtable]},
+    'atmchain_ForeignBridge_TransferBack': {'filter_args':[__contractInfo__['ForeignBridge']['address']],'stage':[ATM_Withdraw2_update_DBtable,ATM_Withdraw2_insert_DBtable]},
+    'ethereum_HomeBridge_Withdraw':{'filter_args':[],'stage':[ATM_Withdraw3_update_DBtable]},
+}
+
 
 __DBConfig__ = {
     'host':"localhost",

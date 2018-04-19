@@ -147,20 +147,18 @@ class PYETHAPI(object):
 class DBService(object):
 
     def __init__(self):
-        self.db = None
         self.lock = threading.Lock()
-        self.is_DEPOSIT_table_exist = False
         self.polling_events_callback = dict()
         self.polling_events_callback['ethereum_ATMToken_Transfer'] = self.ethereum_ATMToken_Transfer_to_DB
         self.polling_events_callback['atmchain_ForeignBridge_Deposit'] = self.atmchain_ForeignBridge_Deposit_to_DB
 
-    def ethereum_ATMToken_Transfer_offline_to_DB(self,sql):
-        self.insert_into_sql([sql])
+    def ethereum_ATMToken_Transfer_offline_to_DB(self,db,sql):
+        self.insert_into_sql(db, [sql])
   
-    def ethereum_ATMToken_Transfer_to_DB(self, sql_sets, tx_hash, *args):
+    def ethereum_ATMToken_Transfer_to_DB(self, db, sql_sets, tx_hash, *args):
         """检查tx_hash对应记录数据是否存在"""
         condition = "TRANSACTION_HASH_SRC = '%s'"%(tx_hash)
-        result = self.find_rows('DEPOSIT',condition)
+        result = self.find_rows(db,'DEPOSIT',condition)
         if result == None:
             print('not found table DEPOSIT')
             return
@@ -171,24 +169,24 @@ class DBService(object):
         else:
             print('hash:{} is already in stage {}'.format(tx_hash,result[0][3]))
             return
-        self.insert_into_sql([sql])
+        self.insert_into_sql(db, [sql])
 
 
-    def atmchain_ForeignBridge_Deposit_to_DB(self, sql_sets, tx_hash, *args):
+    def atmchain_ForeignBridge_Deposit_to_DB(self, db, sql_sets, tx_hash, *args):
         
         """检查数据库bridge中是否存在DEPOSIT表， 如果不存在，新建该表"""
-        result = self.find_rows('DEPOSIT',"STAGE = '3'") #and TRANSACTION_HASH_DEST = '{}'
+        result = self.find_rows(db,'DEPOSIT',"STAGE = '3'") #and TRANSACTION_HASH_DEST = '{}'
         for rec in result:
             if rec[8] == tx_hash:
                 return
         sql = sql_sets[0](*args)
-        self.insert_into_sql([sql])
+        self.insert_into_sql(db, [sql])
 
-    def connect(self):
-        self.db = pymysql.connect(**custom_contract_events.__DBConfig__)
+    def init_db(self):
+        db = pymysql.connect(**custom_contract_events.__DBConfig__)
         
         exsist = False
-        cursor = self.db.cursor()
+        cursor = db.cursor()
         try:
             # 执行sql语句
             cursor.execute('show databases')
@@ -199,14 +197,13 @@ class DBService(object):
             if exsist == False:
                 cursor.execute('create database if not exists ' + custom_contract_events.__DBConfig__['db'])
                 # 提交到数据库执行
-                self.db.commit()
+                db.commit()
         except:
-            self.db.rollback()
+            db.rollback()
 
         print("connect mysql ok. db is {} ".format(custom_contract_events.__DBConfig__['db']))
-        """
-        if self.is_table_exist(custom_contract_events.__DBConfig__['db'], 'DEPOSIT') == False:
-            fields = "ID INT AUTO_INCREMENT,\
+        
+        fields = "ID INT AUTO_INCREMENT,\
                         USER_ADDRESS  CHAR(42) NOT NULL, \
                         AMOUNT BIGINT, \
                         STAGE INT NOT NULL, \
@@ -218,33 +215,32 @@ class DBService(object):
                         BLOCK_NUMBER_DEST INT,\
                         TIME_STAMP CHAR(32), \
                         PRIMARY KEY (ID,TRANSACTION_HASH_SRC)"
-            self.create_table('DEPOSIT', fields)
-        """
-    def disconnect(self):
-        self.db.close()
 
-    def create_table(self, tablename, columns):
+        if self.is_table_exist(db,custom_contract_events.__DBConfig__['db'], 'DEPOSIT') == False:
+            self.create_table(db,'DEPOSIT', fields)
+        if self.is_table_exist(db,custom_contract_events.__DBConfig__['db'], 'WITHDRAW') == False:
+            self.create_table(db,'WITHDRAW', fields)
+        db.close()
 
-        cursor = self.db.cursor()
+    def create_table(self, db, tablename, columns):
+
+        cursor = db.cursor()
         sql="create table %s("%(tablename,)
         sql+=columns+')'
         try:
             cursor.execute(sql)
             print("Table %s is created"%tablename)
-            self.db.commit()
+            db.commit()
         except:
-            self.db.rollback()
+            db.rollback()
 
-    def is_table_exist(self, dbname, tablename):
-        if tablename == 'DEPOSIT' and self.is_DEPOSIT_table_exist == True:
-            return True
-            
-        cursor=self.db.cursor()
+    def is_table_exist(self, db, dbname, tablename):
+        cursor=db.cursor()
         sql="select table_name from information_schema.TABLES where table_schema='%s' and table_name = '%s'"%(dbname,tablename)
         try:
             cursor.execute(sql)
             results = cursor.fetchall() #接受全部返回行
-            self.db.commit()
+            db.commit()
         except Exception,e:
             #不存在这张表返回错误提示
             print('query db {} table {} fail:{}'.format(dbname,tablename,e.message))
@@ -252,8 +248,6 @@ class DBService(object):
         if not results:
             return False
         else:
-            if tablename == 'DEPOSIT':
-                self.is_DEPOSIT_table_exist = True
             return True
 
     """datas = {(key: value),.....}
@@ -269,44 +263,18 @@ class DBService(object):
             ret.append(sql)
         self.insert_into_sql(ret)
     """
-    def insert_into_sql(self,sqls):
-        cursor = self.db.cursor()
+    def insert_into_sql(self,db,sqls):
+        cursor = db.cursor()
         for sql in sqls:
             # 执行sql语句
             try:
-                self.lock.acquire()
-                #print('DEBUG: ',sql)
                 cursor.execute(sql)
-                self.lock.release()
-                self.db.commit()
+                db.commit()
             except Exception,e:
                 print('insert sql <<{}>> fail:{}'.format(sql,e.message))
-                self.db.rollback()
-                self.lock.release()
+                db.rollback()
 
-    """获取指定table的所有列的名字
-    def find_columns(self, tablename):
-        sql = "select COLUMN_NAME from information_schema.columns where table_name='%s'" % tablename
-        cursor = self.db.cursor()
-        try:
-            self.lock.acquire()
-            cursor.execute(sql)
-            self.lock.release()
-            self.db.commit()
-            results = cursor.fetchall()
-        except:
-            self.lock.release()
-            return tuple()
-        return tuple(map(lambda x: x[0], results))
-    """
-    def find_rows(self, tablename, condition, fieldName=None):
-        """
-        :param tablename: test_scale1015
-        :param condition: transaction_hash = '.....'
-        :param fieldName: None or (columns1010, columns1011, columns1012, columns1013, time)
-        :return:
-        """
-        
+    def find_rows(self, db, tablename, condition, fieldName=None):
         sql = ''
         if fieldName==None:
             #fieldName = self.find_columns(tablename)
@@ -315,19 +283,22 @@ class DBService(object):
             fieldNameStr = ','.join(fieldName)
             sql = "select %s from %s where %s" % (fieldNameStr, tablename, condition)
         
-        db_for_find_rows = pymysql.connect(**custom_contract_events.__DBConfig__)    
         try:
-            cursor = db_for_find_rows.cursor()
+            cursor = db.cursor()
             cursor.execute(sql)
             results = cursor.fetchall()
         except:
-            db_for_find_rows.close()
+            db.close()
             return tuple()
-        db_for_find_rows.close()
         return results
 
+    def new_db_connect(self):
+        return pymysql.connect(**custom_contract_events.__DBConfig__) 
 
-class ATM_DEPOSIT_WORKER(object):
+    def db_close(self, db):
+        db.close()
+
+class ATM_BRIDGE_WORKER(object):
     def __init__(self):
         self.current_blockchain_proxy = dict()
         self.current_connected_chain = list()
@@ -335,15 +306,17 @@ class ATM_DEPOSIT_WORKER(object):
         self.current_query_id = 0
         self.is_stopped = False
         self.DBService = DBService()
+        self.DBService.init_db()
 
     def add_new_chain(self,chain_name,_proxy):
         self.current_connected_chain.append(chain_name)
         self.current_blockchain_proxy[chain_name] = _proxy
 
-    def run(self):
+    def run_deposit_loop(self):
+        db = self.DBService.new_db_connect()
         while not self.is_stopped:
             gevent.sleep(self.query_delay)
-            result = self.DBService.find_rows('DEPOSIT',"STAGE = '2' AND CHAIN_NAME_DEST not in ('atmchain')")
+            result = self.DBService.find_rows(db,'DEPOSIT',"STAGE = '2' AND CHAIN_NAME_DEST not in ('atmchain')")
             if result == None:
                 continue 
             if result == tuple():   
@@ -351,9 +324,19 @@ class ATM_DEPOSIT_WORKER(object):
                 continue
             else:                   #已有记录，更新该记录
                 sqls = ["UPDATE DEPOSIT SET CHAIN_NAME_DEST = '%s' WHERE TRANSACTION_HASH_SRC = '%s'" % ('atmchain', record[5]) for record in result]
-                self.DBService.insert_into_sql(sqls)
+                self.DBService.insert_into_sql(db,sqls)
                 for record in result:
                     self.deposit(record[1], record[2], record[5])
+
+        self.DBService.db_close(db)
+
+    def run_withdraw_loop(self):
+        db = self.DBService.new_db_connect()
+        while not self.is_stopped:
+            gevent.sleep(self.query_delay)
+            
+
+        self.DBService.db_close(db)
 
     def deposit(self, recipient, value, tx_hash_src):
         value = value * (10**10)
@@ -370,29 +353,41 @@ class ATM_DEPOSIT_WORKER(object):
         txhash = contract_proxy.deposit('0x'+recipient,value,unhexlify(tx_hash_src[2:]),value=value)
         _proxy.poll_contarct_transaction_result(txhash)
 
+     def withdraw(self, recipient, value, tx_hash_src):
+         pass
+
     def deposit_manual(self,id):
-        result = self.DBService.find_rows('DEPOSIT',"STAGE = '2' AND CHAIN_NAME_DEST = 'atmchain' AND ID < '{}'".format(id))
+        db = self.DBService.new_db_connect()
+        result = self.DBService.find_rows(db, 'DEPOSIT',"STAGE = '2' AND CHAIN_NAME_DEST = 'atmchain' AND ID < '{}'".format(id))
         if result == None or result == tuple():
             return
         else:
             for record in result:
                 self.deposit(record[1], record[2], record[5])
+        self.DBService.db_close(db)
+
+    def withdraw_manual(self,id):
+        pass
 
     def deposit_status(self,user,tx_hash):
+        db = self.DBService.new_db_connect()
         if user[:2] == '0x':
             user = user[2:]
         if tx_hash != None and tx_hash[:2] != '0x':
             print("transaction hash must be start with '0x'.")
             return list()
         if tx_hash == None or tx_hash == "":
-            result = self.DBService.find_rows('DEPOSIT',"USER_ADDRESS = '{}'".format(user))
+            result = self.DBService.find_rows(db, 'DEPOSIT',"USER_ADDRESS = '{}'".format(user))
         else:
-            result = self.DBService.find_rows('DEPOSIT',"TRANSACTION_HASH_SRC = '{}'".format(tx_hash))
+            result = self.DBService.find_rows(db, 'DEPOSIT',"TRANSACTION_HASH_SRC = '{}'".format(tx_hash))
+        self.DBService.db_close(db)
         return result
+
+    def withdraw_status(self,user,tx_hash):
+        pass
 
     def stop(self):
         self.is_stopped = True
-        self.DBService.disconnect()
 
 class LISTEN_CONTRACT_EVENTS_TASK(object):
     def __init__(self):
@@ -405,6 +400,7 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
         self.polled_blocknumber = dict()
         self.is_stopped = False
         self.DBService = DBService()
+        self.DBService.init_db()
 
     def add_new_chain(self,chain_name,_proxy):
         self.current_connected_chain.append(chain_name)
@@ -431,6 +427,7 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
                     contract_address=unhexlify(custom_contract_events.__contractInfo__[contract_name]['address']),)
     
     def run(self):
+        db = self.DBService.new_db_connect()
         while not self.is_stopped:
             gevent.sleep(self.polling_delay)
             self.update_polling_event()
@@ -460,13 +457,13 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
                             print('CHAIN: {} catched event: {}. block: {} hash:{}'.format(chain_name,event_name,event['block_number'],event['transaction_hash']))
                             DBcallback = self.DBService.polling_events_callback[chain_name + '_' + contract_name + '_' + event_name]
                             sql_sets = self.polling_events[chain_name][contract_name][event_name]['stage']
-                            DBcallback(sql_sets,event['transaction_hash'],(event))
+                            DBcallback(db,sql_sets,event['transaction_hash'],(event))
                         
                 self.polled_blocknumber[chain_name] = polling_current_blocknumber
-
+        self.DBService.db_close(db)
+    
     def stop(self):
         self.is_stopped = True
-        self.DBService.disconnect()
 
 class PYETHAPI_ATMCHAIN(PYETHAPI):
 
@@ -474,36 +471,44 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
         print('init PYETHAPI_ATMCHAIN ...')
         super(PYETHAPI_ATMCHAIN, self).__init__(blockchain_service)
         self.listen_contract_events = LISTEN_CONTRACT_EVENTS_TASK()
-        self.listen_contract_events.DBService.connect()
         polling = Greenlet.spawn(
             self.listen_contract_events.run,
         ) 
-        self.atm_deposit_worker = ATM_DEPOSIT_WORKER()
-        self.atm_deposit_worker.DBService.connect()
-        polling = Greenlet.spawn(
-            self.atm_deposit_worker.run,
+        self.atm_bridge_worker = ATM_BRIDGE_WORKER()
+        polling1 = Greenlet.spawn(
+            self.atm_bridge_worker.run_deposit_loop,
         ) 
+        polling2 = Greenlet.spawn(
+            self.atm_bridge_worker.run_withdraw_loop,
+        )
     
     def new_blockchain_proxy(self, chain_name,endpoint,keystore_path):
         _proxy = super(PYETHAPI_ATMCHAIN, self).new_blockchain_proxy(chain_name,endpoint,keystore_path)
         self.listen_contract_events.add_new_chain(chain_name,_proxy)
-        self.atm_deposit_worker.add_new_chain(chain_name,_proxy)
+        self.atm_bridge_worker.add_new_chain(chain_name,_proxy)
         return _proxy
 
     def deposit_atm_manual(self,id):
-        self.atm_deposit_worker.deposit_manual(id)
+        self.atm_bridge_worker.deposit_manual(id)
 
     def query_atm_deposit_status(self,user,tx_hash):
-        return self.atm_deposit_worker.deposit_status(user,tx_hash)
+        return self.atm_bridge_worker.deposit_status(user,tx_hash)
+
+    def withdraw_atm_manual(self,id):
+        self.atm_bridge_worker.withdraw_manual(id)
+
+    def query_atm_withdraw_status(self,user,tx_hash):
+        return self.atm_bridge_worker.withdraw_status(user,tx_hash)
 
     """执行离线交易"""
     def send_raw_transaction(self,chain_name,signed_data):
         _proxy = self._get_chain_proxy(chain_name)
         transaction_hash = _proxy.sendRawTransaction(signed_data)
         #过滤向homebridge转atm token的离线交易
-        if transaction_hash !='' and signed_data[76:84] == 'a9059cbb' and signed_data[108:148] == custom_contract_events.__contractInfo__['HomeBridge']['address']:
+        if chain_name == 'ethereum' and transaction_hash !='' and signed_data[76:84] == 'a9059cbb' and signed_data[108:148] == custom_contract_events.__contractInfo__['HomeBridge']['address']:
             sql = custom_contract_events.ATM_Deposit1_insert_DBtable('0x'+transaction_hash)
-            self.atm_deposit_worker.DBService.ethereum_ATMToken_Transfer_offline_to_DB(sql)
+            self.atm_bridge_worker.DBService.ethereum_ATMToken_Transfer_offline_to_DB(sql)
+
         return transaction_hash
 
     def query_currency_balance(self,chain_name,account):
