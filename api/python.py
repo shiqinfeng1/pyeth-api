@@ -18,7 +18,6 @@ from service.accounts_manager import Account,find_keystoredir
 from ethereum.utils import encode_hex
 import custom.custom_contract_events as custom_contract_events
 
-lock = threading.Lock()
 
 class PYETHAPI(object):
     """ CLI interface. """
@@ -149,78 +148,45 @@ class DBService(object):
 
     def __init__(self):
         self.db = None
+        self.lock = threading.Lock()
         self.is_DEPOSIT_table_exist = False
         self.polling_events_callback = dict()
-        self.polling_events_callback['ethereum_ATMToken_Transfer_offline'] = self.ethereum_ATMToken_Transfer_offline_to_DB
         self.polling_events_callback['ethereum_ATMToken_Transfer'] = self.ethereum_ATMToken_Transfer_to_DB
         self.polling_events_callback['atmchain_ForeignBridge_Deposit'] = self.atmchain_ForeignBridge_Deposit_to_DB
 
-    def ethereum_ATMToken_Transfer_offline_to_DB(self, sql_sets, tx_hash, *args):
-        
-        """检查数据库bridge中是否存在DEPOSIT表， 如果不存在，新建该表"""
-        if self.is_table_exist(custom_contract_events.__DBConfig__['db'], 'DEPOSIT') == False:
-            fields = "ID INT AUTO_INCREMENT,\
-                        USER_ADDRESS  CHAR(42) NOT NULL, \
-                        AMOUNT BIGINT, \
-                        STAGE INT NOT NULL, \
-                        CHAIN_NAME_SRC  CHAR(20), \
-                        TRANSACTION_HASH_SRC CHAR(255) NOT NULL, \
-                        BLOCK_NUMBER_SRC INT, \
-                        CHAIN_NAME_DEST  CHAR(20), \
-                        TRANSACTION_HASH_DEST CHAR(255), \
-                        BLOCK_NUMBER_DEST INT,\
-                        TIME_STAMP CHAR(32), \
-                        PRIMARY KEY (ID,TRANSACTION_HASH_SRC)"
-            self.create_table('DEPOSIT', fields)
-
-        sql = sql_sets[0](*args)
+    def ethereum_ATMToken_Transfer_offline_to_DB(self,sql):
         self.insert_into_sql([sql])
   
     def ethereum_ATMToken_Transfer_to_DB(self, sql_sets, tx_hash, *args):
-
-        """检查数据库bridge中是否存在DEPOSIT表， 如果不存在，新建该表"""
-        if self.is_table_exist(custom_contract_events.__DBConfig__['db'], 'DEPOSIT') == False:
-            fields = "ID INT AUTO_INCREMENT,\
-                        USER_ADDRESS  CHAR(42) NOT NULL, \
-                        AMOUNT BIGINT, \
-                        STAGE INT NOT NULL, \
-                        CHAIN_NAME_SRC  CHAR(20), \
-                        TRANSACTION_HASH_SRC CHAR(255) NOT NULL, \
-                        BLOCK_NUMBER_SRC INT, \
-                        CHAIN_NAME_DEST  CHAR(20), \
-                        TRANSACTION_HASH_DEST CHAR(255), \
-                        BLOCK_NUMBER_DEST INT,\
-                        TIME_STAMP CHAR(32), \
-                        PRIMARY KEY (ID,TRANSACTION_HASH_SRC)"
-            self.create_table('DEPOSIT', fields)
-
         """检查tx_hash对应记录数据是否存在"""
-        result = self.find_rows('DEPOSIT',"TRANSACTION_HASH_SRC = '{}'".format(tx_hash))
+        condition = "TRANSACTION_HASH_SRC = '%s'"%(tx_hash)
+        result = self.find_rows('DEPOSIT',condition)
         if result == None:
             print('not found table DEPOSIT')
-            return 
+            return
         if result == tuple():   #没有记录， 插入该记录
             sql = sql_sets[1](*args)
-        else:                   #已有记录，更新该记录
+        elif result[0][3] == 1:      #已有记录，并且处于stage 1， 更新该记录
             sql = sql_sets[0](*args)
+        else:
+            print('hash:{} is already in stage {}'.format(tx_hash,result[0][3]))
+            return
         self.insert_into_sql([sql])
-        #print('ethereum_ATMToken_Transfer_to_DB sql is {}'.format(sql))
+
 
     def atmchain_ForeignBridge_Deposit_to_DB(self, sql_sets, tx_hash, *args):
         
         """检查数据库bridge中是否存在DEPOSIT表， 如果不存在，新建该表"""
-        if self.is_table_exist(custom_contract_events.__DBConfig__['db'], 'DEPOSIT') == False:
-            return
-
-        result = self.find_rows('DEPOSIT',"STAGE = '3' AND TRANSACTION_HASH_DEST = '{}'".format(tx_hash))
-        if len(result)>0:
-            return
+        result = self.find_rows('DEPOSIT',"STAGE = '3'") #and TRANSACTION_HASH_DEST = '{}'
+        for rec in result:
+            if rec[8] == tx_hash:
+                return
         sql = sql_sets[0](*args)
-        print('DEPOSIT EXEC SQL: {}'.format(sql))
         self.insert_into_sql([sql])
 
     def connect(self):
         self.db = pymysql.connect(**custom_contract_events.__DBConfig__)
+        
         exsist = False
         cursor = self.db.cursor()
         try:
@@ -238,6 +204,22 @@ class DBService(object):
             self.db.rollback()
 
         print("connect mysql ok. db is {} ".format(custom_contract_events.__DBConfig__['db']))
+        """
+        if self.is_table_exist(custom_contract_events.__DBConfig__['db'], 'DEPOSIT') == False:
+            fields = "ID INT AUTO_INCREMENT,\
+                        USER_ADDRESS  CHAR(42) NOT NULL, \
+                        AMOUNT BIGINT, \
+                        STAGE INT NOT NULL, \
+                        CHAIN_NAME_SRC  CHAR(20), \
+                        TRANSACTION_HASH_SRC CHAR(255) NOT NULL, \
+                        BLOCK_NUMBER_SRC INT, \
+                        CHAIN_NAME_DEST  CHAR(20), \
+                        TRANSACTION_HASH_DEST CHAR(255), \
+                        BLOCK_NUMBER_DEST INT,\
+                        TIME_STAMP CHAR(32), \
+                        PRIMARY KEY (ID,TRANSACTION_HASH_SRC)"
+            self.create_table('DEPOSIT', fields)
+        """
     def disconnect(self):
         self.db.close()
 
@@ -247,11 +229,9 @@ class DBService(object):
         sql="create table %s("%(tablename,)
         sql+=columns+')'
         try:
-            lock.acquire()
             cursor.execute(sql)
             print("Table %s is created"%tablename)
             self.db.commit()
-            lock.release()
         except:
             self.db.rollback()
 
@@ -262,11 +242,9 @@ class DBService(object):
         cursor=self.db.cursor()
         sql="select table_name from information_schema.TABLES where table_schema='%s' and table_name = '%s'"%(dbname,tablename)
         try:
-            lock.acquire()
             cursor.execute(sql)
             results = cursor.fetchall() #接受全部返回行
             self.db.commit()
-            lock.release()
         except Exception,e:
             #不存在这张表返回错误提示
             print('query db {} table {} fail:{}'.format(dbname,tablename,e.message))
@@ -278,7 +256,7 @@ class DBService(object):
                 self.is_DEPOSIT_table_exist = True
             return True
 
-    """datas = {(key: value),.....}"""
+    """datas = {(key: value),.....}
     def insert_mysql_with_json(self, tablename, datas):
         keys = datas[0].keys()
         keys = str(tuple(keys))
@@ -290,33 +268,37 @@ class DBService(object):
             sql = sql + " values" + str(tuple(values))
             ret.append(sql)
         self.insert_into_sql(ret)
-
+    """
     def insert_into_sql(self,sqls):
         cursor = self.db.cursor()
         for sql in sqls:
             # 执行sql语句
             try:
-                lock.acquire()
+                self.lock.acquire()
+                #print('DEBUG: ',sql)
                 cursor.execute(sql)
+                self.lock.release()
                 self.db.commit()
-                lock.release()
-            except:
+            except Exception,e:
+                print('insert sql <<{}>> fail:{}'.format(sql,e.message))
                 self.db.rollback()
+                self.lock.release()
 
-    """获取指定table的所有列的名字"""
+    """获取指定table的所有列的名字
     def find_columns(self, tablename):
         sql = "select COLUMN_NAME from information_schema.columns where table_name='%s'" % tablename
         cursor = self.db.cursor()
         try:
-            lock.acquire()
+            self.lock.acquire()
             cursor.execute(sql)
+            self.lock.release()
             self.db.commit()
-            lock.release()
             results = cursor.fetchall()
         except:
+            self.lock.release()
             return tuple()
         return tuple(map(lambda x: x[0], results))
-
+    """
     def find_rows(self, tablename, condition, fieldName=None):
         """
         :param tablename: test_scale1015
@@ -324,10 +306,7 @@ class DBService(object):
         :param fieldName: None or (columns1010, columns1011, columns1012, columns1013, time)
         :return:
         """
-        if self.is_table_exist(custom_contract_events.__DBConfig__['db'], 'DEPOSIT') == False:
-            return None
-
-        cursor = self.db.cursor()
+        
         sql = ''
         if fieldName==None:
             #fieldName = self.find_columns(tablename)
@@ -335,16 +314,16 @@ class DBService(object):
         else:
             fieldNameStr = ','.join(fieldName)
             sql = "select %s from %s where %s" % (fieldNameStr, tablename, condition)
-            
+        
+        db_for_find_rows = pymysql.connect(**custom_contract_events.__DBConfig__)    
         try:
-            lock.acquire()
+            cursor = db_for_find_rows.cursor()
             cursor.execute(sql)
-            self.db.commit()
-            lock.release()
             results = cursor.fetchall()
         except:
+            db_for_find_rows.close()
             return tuple()
-        #print(tablename,condition,sql,results)
+        db_for_find_rows.close()
         return results
 
 
@@ -366,9 +345,9 @@ class ATM_DEPOSIT_WORKER(object):
             gevent.sleep(self.query_delay)
             result = self.DBService.find_rows('DEPOSIT',"STAGE = '2' AND CHAIN_NAME_DEST not in ('atmchain')")
             if result == None:
-                return 
-            if result == tuple():   #没有记录， 插入该记录
-                #print('step idle')
+                continue 
+            if result == tuple():   
+                #print('step idle2')
                 continue
             else:                   #已有记录，更新该记录
                 sqls = ["UPDATE DEPOSIT SET CHAIN_NAME_DEST = '%s' WHERE TRANSACTION_HASH_SRC = '%s'" % ('atmchain', record[5]) for record in result]
@@ -475,8 +454,10 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
                             *self.polling_events[chain_name][contract_name][event_name]["filter_args"]
                         )
                         if events == list():
+                            print('step idle ',event_name)
                             continue
                         for event in events:
+                            print('CHAIN: {} catched event: {}. block: {} hash:{}'.format(chain_name,event_name,event['block_number'],event['transaction_hash']))
                             DBcallback = self.DBService.polling_events_callback[chain_name + '_' + contract_name + '_' + event_name]
                             sql_sets = self.polling_events[chain_name][contract_name][event_name]['stage']
                             DBcallback(sql_sets,event['transaction_hash'],(event))
@@ -515,110 +496,15 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
     def query_atm_deposit_status(self,user,tx_hash):
         return self.atm_deposit_worker.deposit_status(user,tx_hash)
 
-        """执行离线交易"""
+    """执行离线交易"""
     def send_raw_transaction(self,chain_name,signed_data):
         _proxy = self._get_chain_proxy(chain_name)
         transaction_hash = _proxy.sendRawTransaction(signed_data)
         #过滤向homebridge转atm token的离线交易
-        if transaction_hash !='' and signed_data[76:84] == '09059cbb' and signed_data[108:148] == custom_contract_events.__contractInfo__['HomeBridge']['address']:
-            sql = custom_contract_events.ATM_Deposit1_insert_DBtable(transaction_hash)
-            self.atm_deposit_worker.DBService.insert_into_sql([sql])
+        if transaction_hash !='' and signed_data[76:84] == 'a9059cbb' and signed_data[108:148] == custom_contract_events.__contractInfo__['HomeBridge']['address']:
+            sql = custom_contract_events.ATM_Deposit1_insert_DBtable('0x'+transaction_hash)
+            self.atm_deposit_worker.DBService.ethereum_ATMToken_Transfer_offline_to_DB(sql)
         return transaction_hash
-
-    """
-    def ATM_accounts_list(self): 
-        contract_Addresses=dict()
-        ethereum_proxy = self._get_chain_proxy('ethereum')
-        atmchain_proxy = self._get_chain_proxy('atmchain')
-        ERC20Token_ethereum_address = self._get_contract_address(
-            'ethereum',
-            'ATMToken',
-            )
-        TokenExchange_ethereum_address = self._get_contract_address(
-            'ethereum',
-            'TokenExchange',
-            )
-        ERC223Token_atmchain_address = self._get_contract_address(
-            'atmchain',
-            'ERC223Token',
-            )
-        contract_Addresses['ATMToken_address'] = address_encoder(ERC20Token_ethereum_address) if ERC20Token_ethereum_address != None else 'NOT deployed'
-        contract_Addresses['TokenExchange_address'] = address_encoder(TokenExchange_ethereum_address) if TokenExchange_ethereum_address != None else 'NOT deployed'
-        contract_Addresses['ERC223Token_address'] = address_encoder(ERC223Token_atmchain_address) if ERC223Token_atmchain_address != None else 'NOT deployed'
-
-        return contract_Addresses,self.eth_accounts_list('ethereum'),self.eth_accounts_list('atmchain')
-
-   
-    def lock_ATM(self,from_chain,to_chain,advertiser,lock_amount):
-        
-        ethereum_proxy = self._get_chain_proxy(from_chain)
-        atmchain_proxy = self._get_chain_proxy(to_chain)
-
-        ERC20Token_ethereum_owner = ethereum_proxy.attach_contract(
-            'ATMToken',
-            attacher=ethereum_proxy.account_manager.admin_account,
-            )
-        TokenExchange_ethereum_owner = ethereum_proxy.attach_contract(
-            'TokenExchange',
-            attacher=ethereum_proxy.account_manager.admin_account,
-            )
-        ERC20Token_ethereum_advister = ethereum_proxy.attach_contract(
-            'ATMToken',
-            attacher=advertiser,
-            )
-        ERC223Token_atmchain_owner = atmchain_proxy.attach_contract(
-            'ERC223Token',
-            attacher=ethereum_proxy.account_manager.admin_account,
-            )
-        block_number = ethereum_proxy.block_number()
-        txhash = ERC20Token_ethereum_advister.transfer(
-            TokenExchange_ethereum_owner.address,lock_amount*constant.ATM_DECIMALS)
-        ethereum_proxy.poll_contarct_transaction_result(
-            txhash,block_number,ERC20Token_ethereum_advister,'Transfer',TokenExchange_ethereum_owner.address)
-
-        block_number = ethereum_proxy.block_number()
-        txhash = TokenExchange_ethereum_owner.lockToken(
-            normalize_address(advertiser),lock_amount*constant.ATM_DECIMALS)
-        ethereum_proxy.poll_contarct_transaction_result(
-            txhash,block_number,TokenExchange_ethereum_owner,'LogLockToken',advertiser)
-
-        block_number = atmchain_proxy.block_number()
-        txhash = ERC223Token_atmchain_owner.mint(advertiser,lock_amount)
-        atmchain_proxy.poll_contarct_transaction_result(
-            txhash,block_number,ERC223Token_atmchain_owner,'Minted',advertiser) 
-
-    def settle_ATM(self,from_chain,to_chain,scaner,settle_amount):
-        
-        ethereum_proxy = self._get_chain_proxy(from_chain)
-        atmchain_proxy = self._get_chain_proxy(to_chain)
-
-        ERC223Token_atmchain_owner = atmchain_proxy.attach_contract(
-            'ERC223Token',
-            attacher=ethereum_proxy.account_manager.admin_account,
-            )
-
-        if settle_amount > ERC223Token_atmchain_owner.balanceOf(scaner)/constant.ATM_DECIMALS:
-            raise ValueError('insufficient token balance of {}'.format(scaner))
-
-        ERC223Token_atmchain_scaner = atmchain_proxy.attach_contract(
-            'ERC223Token',
-            attacher=scaner,
-            )
-        TokenExchange_ethereum_owner = ethereum_proxy.attach_contract(
-            'TokenExchange',
-            attacher=ethereum_proxy.account_manager.admin_account,
-            )
-
-        block_number = atmchain_proxy.block_number()
-        txhash = ERC223Token_atmchain_scaner.transfer(
-            constant.BLACKHOLE_ADDRESS,settle_amount*constant.ATM_DECIMALS,'')
-        atmchain_proxy.poll_contarct_transaction_result(
-            txhash,block_number,ERC223Token_atmchain_scaner,'Transfer',scaner,constant.BLACKHOLE_ADDRESS)
-
-        block_number = ethereum_proxy.block_number()
-        txhash = TokenExchange_ethereum_owner.settleToken(scaner,settle_amount*constant.ATM_DECIMALS)
-        ethereum_proxy.poll_contarct_transaction_result(txhash,block_number,TokenExchange_ethereum_owner,'LogSettleToken',scaner)
-    """
 
     def query_currency_balance(self,chain_name,account):
         _proxy = self._get_chain_proxy(chain_name)
@@ -631,7 +517,6 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
 
         result=dict()
         ethereum_proxy = self._get_chain_proxy(src_chain)
-        atmchain_proxy = self._get_chain_proxy(dest_chain)
 
         ERC20Token_ethereum = ethereum_proxy.attach_contract(
                     'ATMToken',

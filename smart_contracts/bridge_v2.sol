@@ -167,6 +167,9 @@ contract HomeBridge {
         requiredSignatures = requiredSignaturesParam;
         authorities = authoritiesParam;
     }
+    function withdraw(address recipient, uint256 value, bytes32 transactionHash){
+
+    }
 }
 
 contract ForeignBridge {
@@ -192,8 +195,7 @@ contract ForeignBridge {
     /// triggered when an authority confirms a deposit
     event DepositConfirmation(address recipient, uint256 value, bytes32 transactionHash);
     event Deposit(address recipient, uint256 value, bytes32 transactionHash);
-    event Withdraw(address recipient, uint256 value, uint256 homeGasPrice);
-    event WithdrawSignatureSubmitted(bytes32 messageHash);
+    event Transfer(address recipient, uint256 value);
     event CollectedSignatures(address authorityResponsibleForRelay, bytes32 messageHash);
 
     function ForeignBridge(
@@ -222,13 +224,15 @@ contract ForeignBridge {
         _;
     }
 
-
     /// Used to deposit money to the contract.
     ///
     /// deposit recipient (bytes20)
     /// deposit value (uint256)
     /// mainnet transaction hash (bytes32) // to avoid transaction duplication
-    function deposit(address recipient, uint256 value, bytes32 transactionHash) payable public onlyAuthority() {
+    function deposit(address recipient, uint256 value, bytes32 transactionHash) public onlyAuthority() {
+        
+        require(address(this).balance > value);
+        
         // Protection from misbehaving authority
         bytes32 hash = keccak256(recipient, value, transactionHash);
 
@@ -244,64 +248,14 @@ contract ForeignBridge {
             DepositConfirmation(recipient, value, transactionHash);
             return;
         }
-        recipient.transfer(msg.value);
-        Deposit(recipient, msg.value, transactionHash);
+
+        recipient.transfer(value);
+        Deposit(recipient, value, transactionHash);
     }
 
-/*
-    /// Transfer `value` from `msg.sender`s local balance (on `foreign` chain) to `recipient` on `home` chain.
-    ///
-    /// immediately decreases `msg.sender`s local balance.
-    /// emits a `Withdraw` event which will be picked up by the bridge authorities.
-    /// bridge authorities will then sign off (by calling `submitSignature`) on a message containing `value`,
-    /// `recipient` and the `hash` of the transaction on `foreign` containing the `Withdraw` event.
-    /// once `requiredSignatures` are collected a `CollectedSignatures` event will be emitted.
-    /// an authority will pick up `CollectedSignatures` an call `HomeBridge.withdraw`
-    /// which transfers `value - relayCost` to `recipient` completing the transfer.
-    function transferHomeViaRelay(address recipient, uint256 value) public {
-        // require(balances[msg.sender] >= value);
-        // don't allow 0 value transfers to home
-        require(value > 0);
-
+    function () public payable {
+        require(msg.value > 10**10);
+        uint value = msg.value / 10**10;
+        Transfer(msg.sender,value);
     }
-
-    /// Should be used as sync tool
-    ///
-    /// Message is a message that should be relayed to main chain once authorities sign it.
-    ///
-    /// for withdraw message contains:
-    /// withdrawal recipient (bytes20)
-    /// withdrawal value (uint256)
-    /// foreign transaction hash (bytes32) // to avoid transaction duplication
-    function submitSignature(bytes signature, bytes message) public onlyAuthority() {
-        // ensure that `signature` is really `message` signed by `msg.sender`
-        require(msg.sender == MessageSigning.recoverAddressFromSignedMessage(signature, message));
-
-        require(message.length == 116);
-        var hash = keccak256(message);
-
-        // each authority can only provide one signature per message
-        require(!addressArrayContains(signatures[hash].signed, msg.sender));
-        signatures[hash].message = message;
-        signatures[hash].signed.push(msg.sender);
-        signatures[hash].signatures.push(signature);
-
-        // TODO: this may cause troubles if requiredSignatures len is changed
-        if (signatures[hash].signed.length == requiredSignatures) {
-            CollectedSignatures(msg.sender, hash);
-        } else {
-            WithdrawSignatureSubmitted(hash);
-        }
-    }
-
-    /// Get signature
-    function signature(bytes32 hash, uint256 index) public   returns (bytes) {
-        return signatures[hash].signatures[index];
-    }
-
-    /// Get message
-    function message(bytes32 hash) public   returns (bytes) {
-        return signatures[hash].message;
-    }
-*/
 }

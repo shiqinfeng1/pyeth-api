@@ -153,14 +153,14 @@ def ATM_Deposit1_insert_DBtable(tx_hash):
         CHAIN_NAME_SRC, TRANSACTION_HASH_SRC, BLOCK_NUMBER_SRC, \
         CHAIN_NAME_DEST, TRANSACTION_HASH_DEST, BLOCK_NUMBER_DEST,TIME_STAMP) \
         VALUES ('%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s')" % \
-        ('', 0, 1, 'ethereum', tx_hash, 0, '', '', 0,time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
+        ('unknow', 0, 1, 'ethereum', tx_hash, 0, 'unknow', 'unknow', 0,time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
 
     return sql
 
 def ATM_Deposit2_update_DBtable(event):
-    sql = "UPDATE DEPOSIT SET STAGE = '%d', BLOCK_NUMBER_SRC = '%d', TIME_STAMP = '%s') \
+    sql = "UPDATE DEPOSIT SET USER_ADDRESS = '%s', STAGE = '%d', BLOCK_NUMBER_SRC = '%d', AMOUNT = '%d', TIME_STAMP = '%s' \
         WHERE TRANSACTION_HASH_SRC = '%s'" % \
-        (2, event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), event['transaction_hash'])
+        (event['_from'], 2, event['block_number'],event['_value'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), event['transaction_hash'])
 
     return sql
 
@@ -169,7 +169,7 @@ def ATM_Deposit2_insert_DBtable(event):
         CHAIN_NAME_SRC, TRANSACTION_HASH_SRC, BLOCK_NUMBER_SRC, \
         CHAIN_NAME_DEST, TRANSACTION_HASH_DEST, BLOCK_NUMBER_DEST,TIME_STAMP) \
         VALUES ('%s', '%d', '%d', '%s', '%s', '%d', '%s', '%s', '%d', '%s')" % \
-        (event['_from'], event['_value'], 3, 'ethereum', event['transaction_hash'], event['block_number'], '', '', 0,time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
+        (event['_from'], event['_value'], 2, 'ethereum', event['transaction_hash'], event['block_number'], '', '', 0,time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())))
 
     return sql
 
@@ -177,7 +177,7 @@ def ATM_Deposit3_update_DBtable(event):
     sql = "UPDATE DEPOSIT SET STAGE = '%d', \
         CHAIN_NAME_DEST = '%s', TRANSACTION_HASH_DEST = '%s', BLOCK_NUMBER_DEST = '%d',TIME_STAMP = '%s' \
         WHERE TRANSACTION_HASH_SRC = '%s'" % \
-        (4, 'atmchain', event['transaction_hash'], event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), '0x'+hexlify(event['transactionHash']))
+        (3, 'atmchain', event['transaction_hash'], event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), '0x'+hexlify(event['transactionHash']))
 
     return sql
 
