@@ -38,11 +38,11 @@ class PYETHAPI(object):
 
 
     """新建区块链代理"""
-    def new_blockchain_proxy(self, chain_name,endpoint,keystore_path):
+    def new_blockchain_proxy(self, chain_name,endpoint,keystore_path,admin_account=None):
         assert keystore_path != None
         if chain_name not in self.blockchain_service.blockchain_proxy.keys():
             _proxy = self.blockchain_service.new_blockchain_proxy(
-                chain_name, endpoint, keystore_path)
+                chain_name, endpoint, keystore_path,admin_account)
         return _proxy
 
     """查询当前区块链所有代理"""
@@ -217,8 +217,10 @@ class DBService(object):
                         PRIMARY KEY (ID,TRANSACTION_HASH_SRC)"
 
         if self.is_table_exist(db,custom_contract_events.__DBConfig__['db'], 'DEPOSIT') == False:
+            print("create_table DEPOSIT ... ")
             self.create_table(db,'DEPOSIT', fields)
         if self.is_table_exist(db,custom_contract_events.__DBConfig__['db'], 'WITHDRAW') == False:
+            print("create_table DEPOSIT ... ")
             self.create_table(db,'WITHDRAW', fields)
         db.close()
 
@@ -246,8 +248,10 @@ class DBService(object):
             print('query db {} table {} fail:{}'.format(dbname,tablename,e.message))
             return False
         if not results:
+            print('query db {} table {} not exsit'.format(dbname,tablename))
             return False
         else:
+            print('query db {} table {} exsit:{}'.format(dbname,tablename,results))
             return True
 
     """datas = {(key: value),.....}
@@ -319,7 +323,7 @@ class ATM_BRIDGE_WORKER(object):
             result = self.DBService.find_rows(db,'DEPOSIT',"STAGE = '2' AND CHAIN_NAME_DEST not in ('atmchain')")
             if result == None:
                 continue 
-            if result == tuple():   
+            if result == tuple():
                 #print('step idle2')
                 continue
             else:                   #已有记录，更新该记录
@@ -334,7 +338,17 @@ class ATM_BRIDGE_WORKER(object):
         db = self.DBService.new_db_connect()
         while not self.is_stopped:
             gevent.sleep(self.query_delay)
-            
+            result = self.DBService.find_rows(db,'WITHDRAW',"STAGE = '2' AND CHAIN_NAME_DEST not in ('ethereum')")
+            if result == None:
+                continue 
+            if result == tuple():   
+                #print('step idle2')
+                continue
+            else:                   #已有记录，更新该记录
+                sqls = ["UPDATE WITHDRAW SET CHAIN_NAME_DEST = '%s' WHERE TRANSACTION_HASH_SRC = '%s'" % ('ethereum', record[5]) for record in result]
+                self.DBService.insert_into_sql(db,sqls)
+                for record in result:
+                    self.withdraw(record[1], record[2], record[5])
 
         self.DBService.db_close(db)
 
@@ -353,8 +367,20 @@ class ATM_BRIDGE_WORKER(object):
         txhash = contract_proxy.deposit('0x'+recipient,value,unhexlify(tx_hash_src[2:]),value=value)
         _proxy.poll_contarct_transaction_result(txhash)
 
-     def withdraw(self, recipient, value, tx_hash_src):
-         pass
+    def withdraw(self, recipient, value, tx_hash_src):
+        value = value * (10**10)
+        print("withdraw {} to {} for transaction_hash:{}".format(value, recipient, tx_hash_src))
+        _proxy = self.current_blockchain_proxy['ethereum']
+        admin_account = _proxy.account_manager.get_admin_account()
+        contract_proxy = _proxy.attach_contract(
+            'HomeBridge',
+            contract_file=custom_contract_events.__contractInfo__['HomeBridge']['file'],
+            contract_address=unhexlify(custom_contract_events.__contractInfo__['HomeBridge']['address']),
+            attacher=admin_account,
+            password=_proxy.account_manager.get_admin_password(),
+        )
+        txhash = contract_proxy.withdraw(custom_contract_events.__contractInfo__['ATMToken']['address'],'0x'+recipient,value,unhexlify(tx_hash_src[2:]))
+        _proxy.poll_contarct_transaction_result(txhash)
 
     def deposit_manual(self,id):
         db = self.DBService.new_db_connect()
@@ -367,9 +393,16 @@ class ATM_BRIDGE_WORKER(object):
         self.DBService.db_close(db)
 
     def withdraw_manual(self,id):
-        pass
+        db = self.DBService.new_db_connect()
+        result = self.DBService.find_rows(db, 'WITHDRAW',"STAGE = '2' AND CHAIN_NAME_DEST = 'ethereum' AND ID < '{}'".format(id))
+        if result == None or result == tuple():
+            return
+        else:
+            for record in result:
+                self.deposit(record[1], record[2], record[5])
+        self.DBService.db_close(db)
 
-    def deposit_status(self,user,tx_hash):
+    def query_bridge_status(self,bridge_type,user,tx_hash):
         db = self.DBService.new_db_connect()
         if user[:2] == '0x':
             user = user[2:]
@@ -377,14 +410,17 @@ class ATM_BRIDGE_WORKER(object):
             print("transaction hash must be start with '0x'.")
             return list()
         if tx_hash == None or tx_hash == "":
-            result = self.DBService.find_rows(db, 'DEPOSIT',"USER_ADDRESS = '{}'".format(user))
+            result = self.DBService.find_rows(db, bridge_type,"USER_ADDRESS = '{}'".format(user))
         else:
-            result = self.DBService.find_rows(db, 'DEPOSIT',"TRANSACTION_HASH_SRC = '{}'".format(tx_hash))
+            result = self.DBService.find_rows(db, bridge_type,"TRANSACTION_HASH_SRC = '{}'".format(tx_hash))
         self.DBService.db_close(db)
         return result
 
+    def deposit_status(self,user,tx_hash):
+        return self.query_bridge_status('DEPOSIT',user,tx_hash)
+
     def withdraw_status(self,user,tx_hash):
-        pass
+        return self.query_bridge_status('WITHDRAW',user,tx_hash)
 
     def stop(self):
         self.is_stopped = True
@@ -412,10 +448,11 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
         for key in custom_contract_events.__pollingEventSet__ : 
             chain_name,contract_name,event_name = key.split('_')[:3]
             if chain_name in self.current_connected_chain:
-                self.polling_events[chain_name] = dict()
-                self.polling_events[chain_name][contract_name] = dict()
+                if self.polling_events.get(chain_name) == None:
+                    self.polling_events[chain_name] = dict()
+                if self.polling_events[chain_name].get(contract_name) == None:
+                    self.polling_events[chain_name][contract_name] = dict()
                 self.polling_events[chain_name][contract_name][event_name] = custom_contract_events.__pollingEventSet__[key]
-
             key = chain_name + '_' + contract_name
             if self.polling_events_contract_proxy_cache.get(key) == None and \
                 custom_contract_events.__contractInfo__[contract_name]['address']!="":
@@ -425,7 +462,8 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
                     contract_name,
                     contract_file=custom_contract_events.__contractInfo__[contract_name]['file'], 
                     contract_address=unhexlify(custom_contract_events.__contractInfo__[contract_name]['address']),)
-    
+            
+
     def run(self):
         db = self.DBService.new_db_connect()
         while not self.is_stopped:
@@ -451,10 +489,10 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
                             *self.polling_events[chain_name][contract_name][event_name]["filter_args"]
                         )
                         if events == list():
-                            print('step idle ',event_name)
+                            #print('step idle ',contract_name,event_name)
                             continue
                         for event in events:
-                            print('CHAIN: {} catched event: {}. block: {} hash:{}'.format(chain_name,event_name,event['block_number'],event['transaction_hash']))
+                            print('\nCATCHED EVENT: {}::{}. block: {}. hash:{}.\n'.format(chain_name,event_name,event['block_number'],event['transaction_hash']))
                             DBcallback = self.DBService.polling_events_callback[chain_name + '_' + contract_name + '_' + event_name]
                             sql_sets = self.polling_events[chain_name][contract_name][event_name]['stage']
                             DBcallback(db,sql_sets,event['transaction_hash'],(event))
@@ -482,8 +520,8 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
             self.atm_bridge_worker.run_withdraw_loop,
         )
     
-    def new_blockchain_proxy(self, chain_name,endpoint,keystore_path):
-        _proxy = super(PYETHAPI_ATMCHAIN, self).new_blockchain_proxy(chain_name,endpoint,keystore_path)
+    def new_blockchain_proxy(self, chain_name,endpoint,keystore_path,admin_account=None):
+        _proxy = super(PYETHAPI_ATMCHAIN, self).new_blockchain_proxy(chain_name,endpoint,keystore_path,admin_account)
         self.listen_contract_events.add_new_chain(chain_name,_proxy)
         self.atm_bridge_worker.add_new_chain(chain_name,_proxy)
         return _proxy

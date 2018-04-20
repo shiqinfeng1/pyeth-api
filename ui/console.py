@@ -50,12 +50,12 @@ class ATMChainTools(object):
         print("{:20}: {}".format('keystore_path',proxy.account_manager.keystore_path))
         print("{:20}: {}".format('default accounts',list(proxy.account_manager.accounts.keys())))
 
-    def new_blockchain_proxy(self, chain_name,endpoint,keystore_path=None):
+    def new_blockchain_proxy(self, chain_name,endpoint,keystore_path=None,admin_account=None):
         if keystore_path != None:
             keystore_path = os.path.abspath(keystore_path)
         else: 
             keystore_path = os.getcwd()+'/'+sys.argv[0]+'/keystore'
-        proxy = self.pyeth_api.new_blockchain_proxy(chain_name,endpoint,keystore_path)
+        proxy = self.pyeth_api.new_blockchain_proxy(chain_name,endpoint,keystore_path,admin_account)
         self._print_proxy_info(proxy)
 
     def blockchain_proxy_list(self):
@@ -127,12 +127,21 @@ class ATMChainTools(object):
     def ethereum_transfer_eth(self,sender,to,amount):
         self.pyeth_api.transfer_currency("ethereum",sender,to,amount)
 
+    def atmchain_transfer_atm(self,sender,to,amount):
+        self.pyeth_api.transfer_currency("atmchain",sender,to,amount)
+
     def ethereum_transfer_ATM(self,sender,to,amount):
         contract_address = custom_contract_events.__contractInfo__['ATMToken']['address']
         if contract_address == "" or len(contract_address)!=40:
             print("invalid ATM token address:{}".format(contract_address))
             return
         self.pyeth_api.transfer_token("ethereum",contract_address,sender,to,amount,False)
+
+    def deposit(self,user,amount):
+        self.ethereum_transfer_ATM(user,custom_contract_events.__contractInfo__['HomeBridge']['address'],amount)
+
+    def withdraw(self,user,amount):
+        self.atmchain_transfer_atm(user,custom_contract_events.__contractInfo__['ForeignBridge']['address'],amount)
 
     def send_raw_transaction(self,chain_name,signed_data):
         self.pyeth_api.send_raw_transaction(chain_name,signed_data)

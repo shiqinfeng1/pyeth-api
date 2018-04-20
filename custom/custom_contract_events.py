@@ -214,22 +214,22 @@ def ATM_Withdraw3_update_DBtable(event):
     return sql
 
 __contractInfo__ = {
-    'ContractAddress':{'file':'ContractAddress.sol','address':"5f045e04d122a6d6c194fcdfbd6a2bcb24c1c343"},
-    'ATMToken':{'file':'ATMToken.sol','address':"37a016410d9430696195eb07e8614d21873c8db1"},
-    'HomeBridge':{'file':'bridge.sol','address':"c1aaac2d2739169d3d5dfe32e97be0678a7abf39"},
-    'ForeignBridge':{'file':'bridge.sol','address':"4947774318f05231bb896a69d175655017a783c3"},
+    'ContractAddress':{'file':'ContractAddress.sol','address':"37a016410d9430696195eb07e8614d21873c8db1"},
+    'ATMToken':{'file':'ATMToken.sol','address':"0743fd5eeedcd1590e5189a1f6f966071bcfa600"},
+    'HomeBridge':{'file':'bridge_v2.sol','address':"e86ed93ed01ad669a3257346e818a90f9ba06d11"},
+    'ForeignBridge':{'file':'bridge_v2.sol','address':"c1aaac2d2739169d3d5dfe32e97be0678a7abf39"},
 }
 
 __pollingEventSet__ = {
     'ethereum_ATMToken_Transfer': {'filter_args':[__contractInfo__['HomeBridge']['address']],'stage':[ATM_Deposit2_update_DBtable,ATM_Deposit2_insert_DBtable]},
     'atmchain_ForeignBridge_Deposit':{'filter_args':[],'stage':[ATM_Deposit3_update_DBtable]},
-    'atmchain_ForeignBridge_TransferBack': {'filter_args':[__contractInfo__['ForeignBridge']['address']],'stage':[ATM_Withdraw2_update_DBtable,ATM_Withdraw2_insert_DBtable]},
+    'atmchain_ForeignBridge_TransferBack': {'filter_args':[],'stage':[ATM_Withdraw2_update_DBtable,ATM_Withdraw2_insert_DBtable]},
     'ethereum_HomeBridge_Withdraw':{'filter_args':[],'stage':[ATM_Withdraw3_update_DBtable]},
 }
 
 
 __DBConfig__ = {
-    'host':"localhost",
+    'host':"172.16.125.51",
     'port':3306,
     'user':"root",
     'password':"12345678",
@@ -238,6 +238,11 @@ __DBConfig__ = {
 }
 __BridgeConfig__ = {
     'limit':10000*(10**8)
+}
+
+__chainConfig__ = {
+    'ethereum':{'endpoint':"kovan"},
+    'atmchain':{'endpoint':"118.31.71.12:21025"}
 }
     
 

@@ -437,7 +437,7 @@ class JSONRPCClient(object):
         nonce_offset (int): Network's default base nonce number.
     """
 
-    def __init__(self, host, port, privkey, nonce_update_interval=1.0, nonce_offset=0):
+    def __init__(self, host, port, privkey, nonce_update_interval=0.0, nonce_offset=0):
         endpoint = 'http://{}:{}'.format(host, port)
         session = requests.Session()
         adapter = requests.adapters.HTTPAdapter(pool_maxsize=50)
@@ -1142,7 +1142,7 @@ class JSONRPCClient(object):
                 deadline.cancel()
 
 class JSONRPCClient_for_infura(JSONRPCClient):
-    def __init__(self, endpoint, privkey, nonce_update_interval=1.0, nonce_offset=0):
+    def __init__(self, endpoint, privkey, nonce_update_interval=0.0, nonce_offset=0):
         
         session = requests.Session()
         adapter = requests.adapters.HTTPAdapter(pool_maxsize=50)
