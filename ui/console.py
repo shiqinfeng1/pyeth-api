@@ -12,7 +12,7 @@ from gevent.event import Event
 import IPython
 from IPython.lib.inputhook import inputhook_manager
 from devp2p.service import BaseService
-from ethereum.slogging import getLogger
+from ethereum import slogging
 from ethereum.utils import denoms
 from pyethapp.utils import bcolors as bc
 from pyethapp.jsonrpc import default_gasprice
@@ -38,6 +38,12 @@ def ATMChain_print_usage():
 class ATMChainTools(object):
     def __init__(self, pyeth_api):
         self.pyeth_api = pyeth_api
+
+    def set_log_level(self,level):
+        if level not in ('critical','error','warn','warning','info','debug','notest'):
+            print("level not in ('critical','error','warn','warning','info','debug','notest')")
+            return
+        self.pyeth_api.set_log_level(level.upper())
         
     def _print_proxy_info(self,proxy):
         print("=======================================")
@@ -234,7 +240,7 @@ class Console(object):
         ATMChain_print_usage()
 
         # Remove handlers that log to stderr
-        root = getLogger()
+        root = slogging.get_logger("root")
         """
         for handler in root.handlers[:]:
             if isinstance(handler, StreamHandler) and handler.stream == sys.stderr:

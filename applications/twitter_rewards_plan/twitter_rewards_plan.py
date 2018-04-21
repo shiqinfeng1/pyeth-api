@@ -10,8 +10,7 @@ sys.path.append('../../')
 from api.python import PYETHAPI_ATMCHAIN
 from ethereum import slogging
 from binascii import hexlify, unhexlify
-
-log = slogging.getLogger(__name__)
+log = slogging.get_logger('root')
 
 """
 twitter_api = twitter.Api(consumer_key='n3RjtgP7nk1XFAM1ojyJJdo0Z',

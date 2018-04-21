@@ -123,7 +123,6 @@ contract ForeignBridge {
     /// mainnet transaction hash (bytes32) // to avoid transaction duplication
     function deposit(address recipient, uint256 value, bytes32 transactionHash) payable public onlyAuthority() {
         
-        require(address(this).balance > value);
         
         // Protection from misbehaving authority
         bytes32 hash = keccak256(recipient, value, transactionHash);

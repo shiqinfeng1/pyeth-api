@@ -214,10 +214,10 @@ def ATM_Withdraw3_update_DBtable(event):
     return sql
 
 __contractInfo__ = {
-    'ContractAddress':{'file':'ContractAddress.sol','address':"37a016410d9430696195eb07e8614d21873c8db1"},
-    'ATMToken':{'file':'ATMToken.sol','address':"0743fd5eeedcd1590e5189a1f6f966071bcfa600"},
-    'HomeBridge':{'file':'bridge_v2.sol','address':"e86ed93ed01ad669a3257346e818a90f9ba06d11"},
-    'ForeignBridge':{'file':'bridge_v2.sol','address':"c1aaac2d2739169d3d5dfe32e97be0678a7abf39"},
+    'ContractAddress':{'file':'ContractAddress.sol','address':"25e7b4d020a8152e803e7c154296704fe415f103"},
+    'ATMToken':{'file':'ATMToken.sol','address':"94cd062d0a21f6005d677f49afcdfebb0774628b"},
+    'HomeBridge':{'file':'bridge_v2.sol','address':"f65220237a77cb3063e14598125afbe99d9db6ce"},
+    'ForeignBridge':{'file':'bridge_v2.sol','address':"f4bca9c39edfdf579a8f3b144dc90d4e3e302882"},
 }
 
 __pollingEventSet__ = {
@@ -229,20 +229,21 @@ __pollingEventSet__ = {
 
 
 __DBConfig__ = {
-    'host':"172.16.125.51",
+    'host':"localhost",
     'port':3306,
     'user':"root",
-    'password':"12345678",
+    'password':"11111111",
     'db':"atm_bridge",
     'charset':"utf8",
+    'autocommit':True,
 }
 __BridgeConfig__ = {
     'limit':10000*(10**8)
 }
 
 __chainConfig__ = {
-    'ethereum':{'endpoint':"kovan"},
-    'atmchain':{'endpoint':"118.31.71.12:21025"}
+    'ethereum':{'endpoint':"localhost:8544"},
+    'atmchain':{'endpoint':"localhost:8545"}
 }
     
 

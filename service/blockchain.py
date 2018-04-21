@@ -59,7 +59,7 @@ from utils import (
 )
 
 import accounts_manager
-log = slogging.getLogger(__name__)  # pylint: disable=invalid-name
+log = slogging.get_logger("root")  # pylint: disable=invalid-name
 
 # Coding standard for this module:
 #
@@ -339,8 +339,8 @@ class BlockChainProxy(object):
                 gasprice=constant.GAS_PRICE,
                 timeout=constant.DEFAULT_POLL_TIMEOUT,
             )
-        except Exception:
-            print(Exception)
+        except Exception,e:
+            print('deploy contract fail:{}'.format(e.message))
             return None
         log.info('deploying contract: [{}] ok. address: {} .'.format(contract_name,hexlify(contract_proxy.address)))
         self.local_contract_proxys[contract_name] = contract_proxy

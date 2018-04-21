@@ -26,7 +26,7 @@ def toogle_cpu_profiler(atmchain):
     try:
         from atmchain.utils.profiling.cpu import CpuProfiler
     except ImportError:
-        slogging.get_logger(__name__).exception('cannot start cpu profiler')
+        slogging.get_logger("root").exception('cannot start cpu profiler')
         return
 
     if hasattr(atmchain, 'profiler') and isinstance(atmchain.profiler, CpuProfiler):
@@ -42,7 +42,7 @@ def toggle_trace_profiler(atmchain):
     try:
         from atmchain.utils.profiling.trace import TraceProfiler
     except ImportError:
-        slogging.get_logger(__name__).exception('cannot start tracer profiler')
+        slogging.get_logger("root").exception('cannot start tracer profiler')
         return
 
     if hasattr(atmchain, 'profiler') and isinstance(atmchain.profiler, TraceProfiler):
@@ -163,7 +163,7 @@ def run(ctx, **kwargs):
     pyeth_api = None
     if ctx.invoked_subcommand is None:
         print('Welcome to pyeth-api-server!')
-        slogging.configure(':DEBUG')
+        slogging.configure(':WARNING')
         blockchain_proxy = ctx.invoke(app, **kwargs)
 
         if pyeth_api == None:

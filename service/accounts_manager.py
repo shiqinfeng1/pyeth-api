@@ -13,7 +13,7 @@ from uuid import UUID
 from rlp.utils import decode_hex
 from ethereum.utils import sha3, is_string, encode_hex, remove_0x_head, to_string
 
-log = slogging.getLogger(__name__)
+log = slogging.get_logger("root")
 
 def mk_random_privkey():
     k = hex(random.getrandbits(256))[2:-1].zfill(64)

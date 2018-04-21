@@ -4,7 +4,7 @@ from ethereum.utils import normalize_address
 import custom.custom_contract_events as custom_contract_events
 from ethereum import slogging
 from binascii import hexlify, unhexlify
-log = slogging.getLogger(__name__)  # pylint: disable=invalid-name
+log = slogging.get_logger("root")  # pylint: disable=invalid-name
 
 class ContractProxy(object):
     """ Exposes a smart contract as a python object.
