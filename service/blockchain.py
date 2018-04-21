@@ -136,20 +136,22 @@ class BlockChainService(object):
         self.blockchain_proxy =  dict()
 
     """新建链代理"""
-    def new_blockchain_proxy(self,
+    def newBlockchainProxy(self,
             chain_name,
             endpoint,
             keystore_path,
             admin_account=None):
-        
-        self.blockchain_proxy[chain_name] = BlockChainProxy(
-            chain_name,
-            endpoint,
-            keystore_path,
-            admin_account)
-        if self.blockchain_proxy[chain_name] == None:
-            raise RuntimeError('create BlockChainProxy fail.')
-
+        try:
+            self.blockchain_proxy[chain_name] = BlockChainProxy(
+                chain_name,
+                endpoint,
+                keystore_path,
+                admin_account)
+            if self.blockchain_proxy[chain_name] == None:
+                raise RuntimeError('create BlockChainProxy fail.')
+        except Exception,e:
+            print('newBlockchainProxy fail:{}'.format(e.message))
+            return None
         return self.blockchain_proxy[chain_name]
     
     """获取链代理"""
@@ -192,9 +194,10 @@ class BlockChainProxy(object):
                 self.port,
                 '',
             )
+            print("connect to geth ok. to check json rpc ...")
             if not check_json_rpc(self.jsonrpc_client_without_sender):
                 raise RuntimeError('BlockChainProxy connect eth-client fail.')
-
+            print("check_json_rpc ok.")
     def get_jsonrpc_client_with_sender(self, sender, password=None):
         if sender == None:
             return None
@@ -346,7 +349,7 @@ class BlockChainProxy(object):
         self.local_contract_proxys[contract_name] = contract_proxy
         return contract_proxy
 
-    def transfer_currency(self, sender, to, eth_amount,password=None):
+    def transfer_currency(self, chain_name, sender, to, eth_amount,password=None):
         
         client = self.get_jsonrpc_client_with_sender(sender,password)
         if client == None:
@@ -355,17 +358,20 @@ class BlockChainProxy(object):
         balance = self.balance(client.sender)
 
         balance_needed =  eth_amount
-        if balance_needed * constant.WEI_TO_ETH > balance:
+        if balance_needed  > balance:
             print("Not enough balance to fund  accounts with {} eth each. Need {}, have {}".format(
                 eth_amount,
                 balance_needed,
-                balance / constant.WEI_TO_ETH
+                balance 
             ))
 
-        print("Sending {} eth to:".format(eth_amount))
-        
+        if chain_name == 'ethereum':
+            print("Sending {} eth to:".format(eth_amount))
+        else:
+            print("Sending {} ATM to:".format(eth_amount))
+
         print("  - {}".format(to))
-        return client.send_transaction(sender=client.sender, to=to, value=eth_amount * constant.WEI_TO_ETH)
+        return client.send_transaction(sender=client.sender, to=to, value=eth_amount)
 
     def estimate_blocktime(self, oldest=256):
         """Calculate a blocktime estimate based on some past blocks.
@@ -439,28 +445,36 @@ class JSONRPCClient(object):
 
     def __init__(self, host, port, privkey, nonce_update_interval=0.0, nonce_offset=0):
         endpoint = 'http://{}:{}'.format(host, port)
+        print("connect to geth: endpoint={}".format(endpoint))
         session = requests.Session()
+        print("connect to geth: session ok.")
         adapter = requests.adapters.HTTPAdapter(pool_maxsize=50)
+        print("connect to geth: adapter ok.")
         session.mount(endpoint, adapter)
-
+        print("connect to geth: mount ok.")
         self.transport = HttpPostClientTransport(
             endpoint,
             post_method=session.post,
             headers={'content-type': 'application/json'},
         )
-
+        print("connect to geth: transport ok.")
         self.port = port
         self.privkey = privkey
         self.protocol = JSONRPCProtocol()
+        print("connect to geth: protocol ok.")
         if privkey != '':
             self.sender = privatekey_to_address(privkey)
+            print("connect to geth: owner={}.".format(hexlify(self.sender)))
         else:
             self.sender = ''
+            print("connect to geth: no owner.")
+        
         self.nonce_last_update = 0
         self.nonce_current_value = None
         self.nonce_lock = Semaphore()
         self.nonce_update_interval = nonce_update_interval
         self.nonce_offset = nonce_offset
+        print("connect to geth: nonce_update_interval={}.".format(self.nonce_update_interval))
 
     def __repr__(self):
         return '<JSONRPCClient @%d>' % self.port

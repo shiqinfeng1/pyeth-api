@@ -198,7 +198,7 @@ def run(ctx, **kwargs):
             )
 
         admin_account = str(kwargs['admin'])
-        """======创建链代理，并部署相关合约============"""
+        print("======创建链代理:ethereum,atmchain. 并部署相关合约============")
         proxy1 = pyeth_api.new_blockchain_proxy("ethereum",custom_contract_events.__chainConfig__['ethereum']['endpoint'],os.getcwd()+'/'+sys.argv[0]+'/keystore',admin_account)
         proxy2 = pyeth_api.new_blockchain_proxy("atmchain",custom_contract_events.__chainConfig__['atmchain']['endpoint'],os.getcwd()+'/'+sys.argv[0]+'/keystore',admin_account)
         

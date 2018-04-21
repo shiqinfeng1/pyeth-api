@@ -12,10 +12,7 @@ from service.utils import (
     address_encoder,
     address_decoder,
 )
-from werkzeug.routing import (
-    BaseConverter,
-    ValidationError,
-)
+
 class BaseOpts(SchemaOpts):
     """
     This allows for having the Object the Schema encodes to inside of the class Meta

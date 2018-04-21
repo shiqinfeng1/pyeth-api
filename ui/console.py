@@ -131,9 +131,11 @@ class ATMChainTools(object):
         self.pyeth_api.settle_ATM('ethereum','atmchain',scaner,settle_amount)
     """
     def ethereum_transfer_eth(self,sender,to,amount):
+        print("\n***unit of measurement is WEI(10^18) ***\n")
         self.pyeth_api.transfer_currency("ethereum",sender,to,amount)
 
     def atmchain_transfer_atm(self,sender,to,amount):
+        print("\n***unit of measurement is WEI(10^18) ***\n")
         self.pyeth_api.transfer_currency("atmchain",sender,to,amount)
 
     def ethereum_transfer_ATM(self,sender,to,amount):
