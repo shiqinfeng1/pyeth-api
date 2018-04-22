@@ -74,7 +74,19 @@ class ATMChainTools(object):
         result = float(result)/constant.WEI_TO_ETH
         print('------------------------------------')
         print('{:<30}: {:,}'.format(account, result))
-    
+        return result
+
+    def query_token_balance(self,chain_name,account):
+        _proxy = self.pyeth_api._get_chain_proxy(chain_name)
+
+        ERC20Token_ethereum = _proxy.attach_contract(
+                    'ATMToken',
+                    contract_file=custom_contract_events.__contractInfo__['ATMToken']['file'], 
+                    contract_address=unhexlify(custom_contract_events.__contractInfo__['ATMToken']['address']),)
+
+        return ERC20Token_ethereum.balanceOf(account) if ERC20Token_ethereum != None else 0
+  
+
     def query_atmchain_balance(self,account):
         result = self.pyeth_api.query_atmchain_balance('ethereum','atmchain',account)
         res = dict()
@@ -139,6 +151,7 @@ class ATMChainTools(object):
         self.pyeth_api.transfer_currency("atmchain",sender,to,amount)
 
     def ethereum_transfer_ATM(self,sender,to,amount):
+        print("\n***unit of measurement is 10^8 ***\n")
         contract_address = custom_contract_events.__contractInfo__['ATMToken']['address']
         if contract_address == "" or len(contract_address)!=40:
             print("invalid ATM token address:{}".format(contract_address))
@@ -146,9 +159,17 @@ class ATMChainTools(object):
         self.pyeth_api.transfer_token("ethereum",contract_address,sender,to,amount,False)
 
     def deposit(self,user,amount):
+        balance = self.query_token_balance('ethereum',user)
+        if balance < amount:
+            print("user {} in ethereum has insufficient balance: {}. need: {}".format(user,balance,amount))
+            return
         self.ethereum_transfer_ATM(user,custom_contract_events.__contractInfo__['HomeBridge']['address'],amount)
 
     def withdraw(self,user,amount):
+        balance = self.pyeth_api.query_currency_balance('atmchain',user)
+        if int(balance) < amount:
+            print("user {} in atmchain has insufficient balance: {}. need: {}".format(user,balance,amount))
+            return
         self.atmchain_transfer_atm(user,custom_contract_events.__contractInfo__['ForeignBridge']['address'],amount)
 
     def send_raw_transaction(self,chain_name,signed_data):

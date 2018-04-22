@@ -6,7 +6,7 @@ from webargs.flaskparser import parser
 from binascii import hexlify
 from api.v1.resources import (
     create_blueprint,
-    DepositStatusResource,
+    BridgeStatusResource,
     TokensResource,
     RawTransactionResource,
     NonceResource,
@@ -36,7 +36,7 @@ class APIServer(object):
 
     def _add_default_resources(self):
         self.add_resource(TokensResource, '/asset')
-        self.add_resource(DepositStatusResource, '/QueryDepositStatus')
+        self.add_resource(BridgeStatusResource, '/QueryBridgeStatus')
         self.add_resource(RawTransactionResource, '/SendRawTransaction')
         self.add_resource(NonceResource, '/QueryNonce')
         self.add_resource(DepositLimitResource, '/QueryDepositLimit')
@@ -80,10 +80,10 @@ class RestAPI(object):
         print("deployed address:", hexlify(address))
         return {'result':'success','contract_address': hexlify(address)}
 
-    def query_atm_deposit_status(self, user_address, transaction_hash):
-        result = self.pyeth_api.query_atm_deposit_status(user_address, transaction_hash)
+    def query_atm_bridge_status(self, bridge_type,user_address, transaction_hash):
+        result = self.pyeth_api.query_atm_bridge_status(bridge_type,user_address, transaction_hash)
         if result == None or result == list():
-            return {'result':'fail','atm_deposit_status': list()}
+            return {'result':'fail','bridge_type':bridge_type,'atm_bridge_status': list()}
         
         keys = ['ID','USER_ADDRESS','AMOUNT','STAGE','CHAIN_NAME_SRC','TRANSACTION_HASH_SRC','BLOCK_NUMBER_SRC','CHAIN_NAME_DEST','TRANSACTION_HASH_DEST','BLOCK_NUMBER_DEST','TIME_STAMP']
         total = list()
@@ -91,7 +91,7 @@ class RestAPI(object):
             dictionary = dict(zip(keys, list(rec)))
             total.append(dictionary)
 
-        return {'result':'success','atm_deposit_status': total}
+        return {'result':'success','bridge_type':bridge_type,'atm_bridge_status': total}
     
     def send_raw_transaction(self, chain_name,signed_data):
         result = self.pyeth_api.send_raw_transaction(chain_name,signed_data)

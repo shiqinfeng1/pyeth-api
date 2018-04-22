@@ -151,9 +151,13 @@ class Account(object):
             (and the account is locked)
         """
         if self.locked:
-            self._privkey = keys.decode_keystore_json(self.keystore, password)
-            self.locked = False
-            self.address  # get address such that it stays accessible after a subsequent lock
+            try:
+                self._privkey = keys.decode_keystore_json(self.keystore, password)
+                self.locked = False
+            except Exception,e:
+                log.error("accout lock fail: {}. ".format(e.message))
+                self.lock()
+
 
     def lock(self):
         """Relock an unlocked account.

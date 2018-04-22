@@ -163,7 +163,7 @@ def run(ctx, **kwargs):
     pyeth_api = None
     if ctx.invoked_subcommand is None:
         print('Welcome to pyeth-api-server!')
-        slogging.configure(':WARNING')
+        slogging.configure(':INFO')
         blockchain_proxy = ctx.invoke(app, **kwargs)
 
         if pyeth_api == None:

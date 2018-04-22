@@ -126,9 +126,9 @@ class PYETHAPI(object):
         block_number = _proxy.block_number()
         #由于pythpn版本以太坊暂时无法处理同名函数, 暂时通过flag来区分
         if is_erc223 == True:
-            txhash = contract_proxy.transfer(to,amount*constant.ATM_DECIMALS,'')
+            txhash = contract_proxy.transfer(to,amount,'')
         else:
-            txhash = contract_proxy.transfer(to,amount*constant.ATM_DECIMALS)
+            txhash = contract_proxy.transfer(to,amount)
 
         _proxy.poll_contarct_transaction_result(txhash,block_number,contract_proxy,'Transfer',to)
         _proxy.account_manager.get_account(sender,password).lock()
@@ -353,7 +353,7 @@ class ATM_BRIDGE_WORKER(object):
             gevent.sleep(self.query_delay)
             result = self.DBService.find_rows(db,'DEPOSIT',"STAGE = '2' and CHAIN_NAME_DEST not in ('atmchain')")
             if result == None or result == tuple():
-                log.info('step idle: run_deposit_loop')
+                log.debug('step idle: run_deposit_loop')
                 continue
             else:                   #已有记录，更新该记录
                 sqls = ["UPDATE DEPOSIT SET CHAIN_NAME_DEST = '%s' WHERE TRANSACTION_HASH_SRC = '%s'" % ('atmchain', record[5]) for record in result]
@@ -371,7 +371,7 @@ class ATM_BRIDGE_WORKER(object):
             if result == None:
                 continue 
             if result == tuple():   
-                log.info('step idle: run_withdraw_loop')
+                log.debug('step idle: run_withdraw_loop')
                 continue
             else:                   #已有记录，更新该记录
                 sqls = ["UPDATE WITHDRAW SET CHAIN_NAME_DEST = '%s' WHERE TRANSACTION_HASH_SRC = '%s'" % ('ethereum', record[5]) for record in result]
@@ -383,9 +383,12 @@ class ATM_BRIDGE_WORKER(object):
 
     def deposit(self, recipient, value, tx_hash_src):
         value = value * (10**10)
-        
         _proxy = self.current_blockchain_proxy['atmchain']
         admin_account = _proxy.account_manager.get_admin_account()
+        ban_required = _proxy.balance(address_decoder(admin_account))
+        if int(ban_required) < value :
+            log.critical("[atmchain]admin has insuffient ATM balance:{}. required:{}".format(ban_required,value))
+            return
         contract_proxy = _proxy.attach_contract(
             'ForeignBridge',
             contract_file=custom_contract_events.__contractInfo__['ForeignBridge']['file'],
@@ -395,13 +398,22 @@ class ATM_BRIDGE_WORKER(object):
         )
         txhash = contract_proxy.deposit('0x'+recipient,value,unhexlify(tx_hash_src[2:]),value=value)
         _proxy.poll_contarct_transaction_result(txhash)
-        print("\n--------\ndeposit {} to 0x{}\nsrc tx_hash: {}\ndest tx_hash: 0x{}\n--------\n".format(value, recipient, tx_hash_src,txhash))
+        log.info("\n--------\ndeposit {} to 0x{}\nsrc tx_hash: {}\ndest tx_hash: 0x{}\n--------\n".format(value, recipient, tx_hash_src,txhash))
 
     def withdraw(self, recipient, value, tx_hash_src):
-        value = value * (10**10)
-        print("withdraw {} to {} for transaction_hash:{}".format(value, recipient, tx_hash_src))
+        
         _proxy = self.current_blockchain_proxy['ethereum']
         admin_account = _proxy.account_manager.get_admin_account()
+        ERC20Token_ethereum = _proxy.attach_contract(
+                    'ATMToken',
+                    contract_file=custom_contract_events.__contractInfo__['ATMToken']['file'], 
+                    contract_address=unhexlify(custom_contract_events.__contractInfo__['ATMToken']['address']),)
+        
+        ban_required = ERC20Token_ethereum.balanceOf(custom_contract_events.__contractInfo__['HomeBridge']['address']) if ERC20Token_ethereum != None else 0
+        if int(ban_required) < value :
+            log.critical("[ethereum]admin has insuffient ATM token balance:{}. required:{}".format(ban_required,value))
+            return
+        
         contract_proxy = _proxy.attach_contract(
             'HomeBridge',
             contract_file=custom_contract_events.__contractInfo__['HomeBridge']['file'],
@@ -411,6 +423,7 @@ class ATM_BRIDGE_WORKER(object):
         )
         txhash = contract_proxy.withdraw(custom_contract_events.__contractInfo__['ATMToken']['address'],'0x'+recipient,value,unhexlify(tx_hash_src[2:]))
         _proxy.poll_contarct_transaction_result(txhash)
+        log.info("\n--------\nwithdraw {} to 0x{}\nsrc tx_hash: {}\ndest tx_hash: 0x{}\n--------\n".format(value, recipient, tx_hash_src,txhash))
 
     def deposit_manual(self,id):
         db = self.DBService.new_db_connect()
@@ -429,7 +442,7 @@ class ATM_BRIDGE_WORKER(object):
             return
         else:
             for record in result:
-                self.deposit(record[1], record[2], record[5])
+                self.withdraw(record[1], record[2], record[5])
         self.DBService.db_close(db)
 
     def query_bridge_status(self,bridge_type,user,tx_hash):
@@ -587,15 +600,14 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
 
     def deposit_atm_manual(self,id):
         self.atm_bridge_worker.deposit_manual(id)
-
-    def query_atm_deposit_status(self,user,tx_hash):
-        return self.atm_bridge_worker.deposit_status(user,tx_hash)
-
     def withdraw_atm_manual(self,id):
         self.atm_bridge_worker.withdraw_manual(id)
 
-    def query_atm_withdraw_status(self,user,tx_hash):
-        return self.atm_bridge_worker.withdraw_status(user,tx_hash)
+    def query_atm_bridge_status(self,bridge_type,user,tx_hash):
+        if bridge_type == 'deposit':
+            return self.atm_bridge_worker.deposit_status(user,tx_hash)
+        if bridge_type == 'withdraw':
+            return self.atm_bridge_worker.withdraw_status(user,tx_hash)
 
     """执行离线交易"""
     def send_raw_transaction(self,chain_name,signed_data):
@@ -605,6 +617,9 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
         if chain_name == 'ethereum' and transaction_hash !='' and signed_data[76:84] == 'a9059cbb' and signed_data[108:148] == custom_contract_events.__contractInfo__['HomeBridge']['address']:
             sql = custom_contract_events.ATM_Deposit1_insert_DBtable('0x'+transaction_hash)
             self.atm_bridge_worker.DBService.ethereum_ATMToken_Transfer_offline_to_DB(sql)
+
+        if chain_name == 'atmchain':
+            print("to be continue .....",signed_data)
 
         return transaction_hash
 

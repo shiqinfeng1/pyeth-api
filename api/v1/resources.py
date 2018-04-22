@@ -5,7 +5,7 @@ from flask_restful import Resource
 from flask import Blueprint
 from api.v1.encoding import (
     TokenSchema,
-    DepositStatusSchema,
+    BridgeStatusSchema,
     RawTransactionSchema,
     NonceSchema,
     BalanceSchema,
@@ -42,17 +42,17 @@ class TokensResource(BaseResource):
             symbol=symbol,
         )
 
-class DepositStatusResource(BaseResource):
+class BridgeStatusResource(BaseResource):
     
-    post_schema = DepositStatusSchema()
+    post_schema = BridgeStatusSchema()
 
     def __init__(self, **kwargs):
-        super(DepositStatusResource, self).__init__(**kwargs)
+        super(BridgeStatusResource, self).__init__(**kwargs)
 
     @use_kwargs(post_schema, locations=('json',))
-    def post(self, user_address,transaction_hash):
-        return self.rest_api.query_atm_deposit_status(
-            user_address,transaction_hash
+    def post(self, bridge_type,user_address,transaction_hash):
+        return self.rest_api.query_atm_bridge_status(
+            bridge_type,user_address,transaction_hash
         )
 
 class RawTransactionResource(BaseResource):

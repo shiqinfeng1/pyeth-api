@@ -56,7 +56,8 @@ class BaseSchema(Schema):
         decoding_class = self.opts.decoding_class
         return decoding_class(**data)
 
-class DepositStatusSchema(BaseSchema):
+class BridgeStatusSchema(BaseSchema):
+    bridge_type = fields.String(missing=None)
     user_address = fields.String(missing=None)
     transaction_hash = fields.String(missing=None)
 
