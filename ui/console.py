@@ -15,7 +15,7 @@ from devp2p.service import BaseService
 from ethereum import slogging
 from ethereum.utils import denoms
 from pyethapp.utils import bcolors as bc
-from pyethapp.jsonrpc import default_gasprice
+
 from pyethapp.console_service import GeventInputHook, SigINTHandler
 from api.python import PYETHAPI
 from service.utils import  get_contract_path, safe_address_decode,privatekey_to_address
@@ -24,7 +24,7 @@ from service.utils import (
     split_endpoint
 )
 from service import constant
-import custom.custom_contract_events as custom_contract_events
+import custom.custom_contract_events as custom
 # ipython needs to accept "--gui gevent" option
 IPython.core.shellapp.InteractiveShellApp.gui.values += ('gevent',)
 inputhook_manager.register('gevent')(GeventInputHook)
@@ -48,8 +48,8 @@ class ATMChainTools(object):
     def _print_proxy_info(self,proxy):
         print("=======================================")
         print("{:20}: {}".format('chain_name',proxy.chain_name))
-        if proxy.endpoint !=None:
-            print("{:20}: {}".format('endpoint',proxy.endpoint))
+        if proxy.third_party_endpoint !=None:
+            print("{:20}: {}".format('endpoint',proxy.third_party_endpoint))
         else:
             print("{:20}: {}".format('host',proxy.host))
             print("{:20}: {}".format('port',proxy.port))
@@ -69,8 +69,8 @@ class ATMChainTools(object):
             v=self.pyeth_api._get_chain_proxy(k)
             self._print_proxy_info(v)
 
-    def query_currency_balance(self,chain_name,account):
-        result = self.pyeth_api.query_currency_balance(chain_name,account)
+    def query_coin_balance(self,chain_name,account):
+        result = self.pyeth_api.query_coin_balance(chain_name,account)
         result = float(result)/constant.WEI_TO_ETH
         print('------------------------------------')
         print('{:<30}: {:,}'.format(account, result))
@@ -81,8 +81,8 @@ class ATMChainTools(object):
 
         ERC20Token_ethereum = _proxy.attach_contract(
                     'ATMToken',
-                    contract_file=custom_contract_events.__contractInfo__['ATMToken']['file'], 
-                    contract_address=unhexlify(custom_contract_events.__contractInfo__['ATMToken']['address']),)
+                    contract_file=custom.__contractInfo__['ATMToken']['file'], 
+                    contract_address=unhexlify(custom.__contractInfo__['ATMToken']['address']),)
 
         return ERC20Token_ethereum.balanceOf(account) if ERC20Token_ethereum != None else 0
   
@@ -93,13 +93,14 @@ class ATMChainTools(object):
 
         res['ETH balance'] = float(result['ETH_balance'])/constant.WEI_TO_ETH
 
-        res['ATM balance in ethereum({})'.format(custom_contract_events.__contractInfo__['ATMToken']['address'])] = float(result['ATM_balance_ethereum'])/constant.ATM_DECIMALS 
+        res['ATM balance in ethereum({})'.format(custom.__contractInfo__['ATMToken']['address'])] = float(result['ATM_balance_ethereum'])/constant.ATM_DECIMALS 
     
         res['ATM balance in atmchain'] = float(result['ATM_balance_atmchain'])/constant.WEI_TO_ETH
 
         print('------------------------------------')
         for key in sorted(res.keys()):
             print('{:<30}: {:,}'.format(key, res[key]))
+
 
     def new_account(self,chain_name, key=None):
         assert isinstance(key,str) and len(key)==64
@@ -135,24 +136,18 @@ class ATMChainTools(object):
         print('------------------------------------\n[atmchain user accounts]:')
         for k, v in enumerate(a2):
             print('{}: {}'.format(k,'0x'+v))
-
-    def lock_ATM(self,adviser,lock_amount):
-        self.pyeth_api.lock_ATM('ethereum','atmchain',adviser,lock_amount)
-
-    def settle_ATM(self,scaner,settle_amount):
-        self.pyeth_api.settle_ATM('ethereum','atmchain',scaner,settle_amount)
     """
     def ethereum_transfer_eth(self,sender,to,amount):
-        print("\n***unit of measurement is WEI(10^18) ***\n")
+        print("\n*** 例：转账 1 eth 请输入 1000000000000000000 (10^18)***\n")
         self.pyeth_api.transfer_currency("ethereum",sender,to,amount)
 
     def atmchain_transfer_atm(self,sender,to,amount):
-        print("\n***unit of measurement is WEI(10^18) ***\n")
+        print("\n*** 例：转账 1 atm 请输入 1000000000000000000 (10^18)***\n")
         self.pyeth_api.transfer_currency("atmchain",sender,to,amount)
 
     def ethereum_transfer_ATM(self,sender,to,amount):
-        print("\n***unit of measurement is 10^8 ***\n")
-        contract_address = custom_contract_events.__contractInfo__['ATMToken']['address']
+        print("\n*** 例：转账 1 ATM 请输入 100000000 (10^8)***\n")
+        contract_address = custom.__contractInfo__['ATMToken']['address']
         if contract_address == "" or len(contract_address)!=40:
             print("invalid ATM token address:{}".format(contract_address))
             return
@@ -163,25 +158,22 @@ class ATMChainTools(object):
         if balance < amount:
             print("user {} in ethereum has insufficient balance: {}. need: {}".format(user,balance,amount))
             return
-        self.ethereum_transfer_ATM(user,custom_contract_events.__contractInfo__['HomeBridge']['address'],amount)
+        self.ethereum_transfer_ATM(user,custom.__contractInfo__['HomeBridge']['address'],amount)
 
     def withdraw(self,user,amount):
-        balance = self.pyeth_api.query_currency_balance('atmchain',user)
-        if int(balance) < amount:
+        balance = self.pyeth_api.query_coin_balance('atmchain',user)
+        if balance < amount:
             print("user {} in atmchain has insufficient balance: {}. need: {}".format(user,balance,amount))
             return
-        self.atmchain_transfer_atm(user,custom_contract_events.__contractInfo__['ForeignBridge']['address'],amount)
+        self.atmchain_transfer_atm(user,custom.__contractInfo__['ForeignBridge']['address'],amount)
 
     def send_raw_transaction(self,chain_name,signed_data):
         self.pyeth_api.send_raw_transaction(chain_name,signed_data)
 
     def deposit_atm_manual(self,id):
         self.pyeth_api.deposit_atm_manual(id)
-
-    def query_deposit_progress(self,user=None,tx_hash=None):
-        result = self.pyeth_api.query_deposit_progress(user,tx_hash)
-        for record in result:
-            print(record)
+    def withdraw_atm_manual(self,id):
+        self.pyeth_api.withdraw_atm_manual(id)
 
 class AppTwitterTools(object):
     def __init__(self, chain):

@@ -16,7 +16,7 @@ from uuid import uuid4
 from service import constant,accounts_manager
 from service.accounts_manager import Account,find_keystoredir
 from ethereum.utils import encode_hex
-import custom.custom_contract_events as custom_contract_events
+import custom.custom_contract_events as custom
 from ethereum import slogging
 log = slogging.get_logger('root')
 
@@ -100,16 +100,18 @@ class PYETHAPI(object):
 
     """原生币转账"""
     def transfer_currency(self,chain_name,sender,to,amount):
-        password = click.prompt('Password to transfer currency coin', default='', hide_input=True,
+        password = click.prompt('Password to unlock %s' % (sender), default='', hide_input=True,
                                 confirmation_prompt=False, show_default=False)
         _proxy = self._get_chain_proxy(chain_name)
 
         transaction_hash_hex = _proxy.transfer_currency(chain_name,sender, to, amount, password=password)
+        if transaction_hash_hex == None:
+            return
         _proxy.poll_contarct_transaction_result(transaction_hash_hex)
     
     """token转账"""
     def transfer_token(self,chain_name,contract_address,sender,to,amount,is_erc223=False):
-        password = click.prompt('Password to unlock {}'.format(sender), default='', hide_input=True,
+        password = click.prompt('Password to unlock %s' % (sender), default='', hide_input=True,
                                 confirmation_prompt=False, show_default=False)
         _proxy = self._get_chain_proxy(chain_name)
         if contract_address[:2] == "0x":
@@ -141,7 +143,10 @@ class PYETHAPI(object):
         return nonce
 
     def get_deposit_limit(self):
-        return custom_contract_events.__BridgeConfig__['limit']
+        return custom.__BridgeConfig__['limit']
+    
+    def get_homebridge_address(self):
+        return "0x"+custom.__contractInfo__['HomeBridge']['address']
 
     def get_balance(self,chain_name,user):
         if chain_name ==None or chain_name=='':
@@ -184,6 +189,7 @@ class DBService(object):
         result = self.find_rows(db,'DEPOSIT',"STAGE = '3'") #and TRANSACTION_HASH_DEST = '{}'
         for rec in result:
             if rec[8] == tx_hash:
+                print('NO NEED Deposit. src_hash:{} is already in stage 3'.format(tx_hash))
                 return
         sql = sql_sets[0](*args)
         self.insert_into_sql(db, [sql])
@@ -206,15 +212,17 @@ class DBService(object):
         self.insert_into_sql(db, [sql])
 
     def ethereum_HomeBridge_Withdraw_to_DB(self, db, sql_sets, tx_hash, *args):
+        # 查找是否已经存在stage=3的记录，stage=3表示已经执行过withdraw
         result = self.find_rows(db,'WITHDRAW',"STAGE = '3'") #and TRANSACTION_HASH_DEST = '{}'
         for rec in result:
             if rec[8] == tx_hash:
+                print('NO NEED Withdraw. src_hash:{} is already in stage {}'.format(tx_hash,rec[3]))
                 return
         sql = sql_sets[0](*args)
         self.insert_into_sql(db, [sql])
 
     def init_db(self):
-        db = pymysql.connect(**custom_contract_events.__DBConfig__)
+        db = pymysql.connect(**custom.__DBConfig__)
         
         exsist = False
         cursor = db.cursor()
@@ -223,16 +231,16 @@ class DBService(object):
             cursor.execute('show databases')
             rows = cursor.fetchall()
             for row in rows:
-                if custom_contract_events.__DBConfig__['db'] in row:
+                if custom.__DBConfig__['db'] in row:
                     exsist = True
             if exsist == False:
-                cursor.execute('create database if not exists ' + custom_contract_events.__DBConfig__['db'])
+                cursor.execute('create database if not exists ' + custom.__DBConfig__['db'])
                 # 提交到数据库执行
                 db.commit()
         except:
             db.rollback()
 
-        print("connect mysql ok. db is {} ".format(custom_contract_events.__DBConfig__['db']))
+        print("connect mysql ok. db is {} ".format(custom.__DBConfig__['db']))
         
         fields = "ID INT AUTO_INCREMENT,\
                         USER_ADDRESS  CHAR(42) NOT NULL, \
@@ -247,10 +255,10 @@ class DBService(object):
                         TIME_STAMP CHAR(32), \
                         PRIMARY KEY (ID,TRANSACTION_HASH_SRC)"
 
-        if self.is_table_exist(db,custom_contract_events.__DBConfig__['db'], 'DEPOSIT') == False:
+        if self.is_table_exist(db,custom.__DBConfig__['db'], 'DEPOSIT') == False:
             print("create_table DEPOSIT ... ")
             self.create_table(db,'DEPOSIT', fields)
-        if self.is_table_exist(db,custom_contract_events.__DBConfig__['db'], 'WITHDRAW') == False:
+        if self.is_table_exist(db,custom.__DBConfig__['db'], 'WITHDRAW') == False:
             print("create_table DEPOSIT ... ")
             self.create_table(db,'WITHDRAW', fields)
         db.close()
@@ -328,7 +336,7 @@ class DBService(object):
         return results
 
     def new_db_connect(self):
-        return pymysql.connect(**custom_contract_events.__DBConfig__) 
+        return pymysql.connect(**custom.__DBConfig__) 
 
     def db_close(self, db):
         db.close()
@@ -343,6 +351,7 @@ class ATM_BRIDGE_WORKER(object):
         self.DBService = DBService()
         self.DBService.init_db()
 
+    # 每次启动bridge服务时，缓存已经创建的链代理；
     def add_new_chain(self,chain_name,_proxy):
         self.current_connected_chain.append(chain_name)
         self.current_blockchain_proxy[chain_name] = _proxy
@@ -358,6 +367,7 @@ class ATM_BRIDGE_WORKER(object):
             else:                   #已有记录，更新该记录
                 sqls = ["UPDATE DEPOSIT SET CHAIN_NAME_DEST = '%s' WHERE TRANSACTION_HASH_SRC = '%s'" % ('atmchain', record[5]) for record in result]
                 self.DBService.insert_into_sql(db,sqls)
+                # record[1],  record[2], record[5]表示 USER_ADDRESS，AMOUNT，TRANSACTION_HASH_SRC
                 for record in result:
                     self.deposit(record[1], record[2], record[5])
 
@@ -382,63 +392,78 @@ class ATM_BRIDGE_WORKER(object):
         self.DBService.db_close(db)
 
     def deposit(self, recipient, value, tx_hash_src):
+        # 由于token atm精度是8，atmchain上atm的精度是18， 因此需要转换一下
         value = value * (10**10)
+        if 'atmchain' not in self.current_blockchain_proxy.keys():
+            log.critical('atmchain has no chainProxy.')
+            return 
         _proxy = self.current_blockchain_proxy['atmchain']
+        # 获取管理员账户地址及余额
         admin_account = _proxy.account_manager.get_admin_account()
         ban_required = _proxy.balance(address_decoder(admin_account))
         if int(ban_required) < value :
-            log.critical("[atmchain]admin has insuffient ATM balance:{}. required:{}".format(ban_required,value))
+            log.critical("[atmchain]admin has insuffient atm balance:{}. required:{}".format(ban_required,value))
             return
+
+        # 获取合约代理
         contract_proxy = _proxy.attach_contract(
             'ForeignBridge',
-            contract_file=custom_contract_events.__contractInfo__['ForeignBridge']['file'],
-            contract_address=unhexlify(custom_contract_events.__contractInfo__['ForeignBridge']['address']),
+            contract_file=custom.__contractInfo__['ForeignBridge']['file'],
+            contract_address=unhexlify(custom.__contractInfo__['ForeignBridge']['address']),
             attacher=admin_account,
             password=_proxy.account_manager.get_admin_password(),
         )
+
+        # 执行合约函数：deposit
         txhash = contract_proxy.deposit('0x'+recipient,value,unhexlify(tx_hash_src[2:]),value=value)
         _proxy.poll_contarct_transaction_result(txhash)
         log.info("\n--------\ndeposit {} to 0x{}\nsrc tx_hash: {}\ndest tx_hash: 0x{}\n--------\n".format(value, recipient, tx_hash_src,txhash))
 
     def withdraw(self, recipient, value, tx_hash_src):
-        
+        if 'ethereum' not in self.current_blockchain_proxy.keys():
+            log.critical('ethereum has no chainProxy.')
+            return
         _proxy = self.current_blockchain_proxy['ethereum']
         admin_account = _proxy.account_manager.get_admin_account()
         ERC20Token_ethereum = _proxy.attach_contract(
                     'ATMToken',
-                    contract_file=custom_contract_events.__contractInfo__['ATMToken']['file'], 
-                    contract_address=unhexlify(custom_contract_events.__contractInfo__['ATMToken']['address']),)
+                    contract_file=custom.__contractInfo__['ATMToken']['file'], 
+                    contract_address=unhexlify(custom.__contractInfo__['ATMToken']['address']),)
         
-        ban_required = ERC20Token_ethereum.balanceOf(custom_contract_events.__contractInfo__['HomeBridge']['address']) if ERC20Token_ethereum != None else 0
+        ban_required = ERC20Token_ethereum.balanceOf(custom.__contractInfo__['HomeBridge']['address']) if ERC20Token_ethereum != None else 0
         if int(ban_required) < value :
             log.critical("[ethereum]admin has insuffient ATM token balance:{}. required:{}".format(ban_required,value))
             return
         
         contract_proxy = _proxy.attach_contract(
             'HomeBridge',
-            contract_file=custom_contract_events.__contractInfo__['HomeBridge']['file'],
-            contract_address=unhexlify(custom_contract_events.__contractInfo__['HomeBridge']['address']),
+            contract_file=custom.__contractInfo__['HomeBridge']['file'],
+            contract_address=unhexlify(custom.__contractInfo__['HomeBridge']['address']),
             attacher=admin_account,
             password=_proxy.account_manager.get_admin_password(),
         )
-        txhash = contract_proxy.withdraw(custom_contract_events.__contractInfo__['ATMToken']['address'],'0x'+recipient,value,unhexlify(tx_hash_src[2:]))
+        txhash = contract_proxy.withdraw(custom.__contractInfo__['ATMToken']['address'],'0x'+recipient,value,unhexlify(tx_hash_src[2:]))
         _proxy.poll_contarct_transaction_result(txhash)
         log.info("\n--------\nwithdraw {} to 0x{}\nsrc tx_hash: {}\ndest tx_hash: 0x{}\n--------\n".format(value, recipient, tx_hash_src,txhash))
 
+    # 只有当监听线程执行deposit失败后(CHAIN_NAME_DEST = 'atnchain')，才可以手动deposit
     def deposit_manual(self,id):
         db = self.DBService.new_db_connect()
         result = self.DBService.find_rows(db, 'DEPOSIT',"STAGE = '2' AND CHAIN_NAME_DEST = 'atmchain' AND ID < '{}'".format(id))
         if result == None or result == tuple():
+            log.info("[deposit_manual]not find matched records: STAGE = '2' AND CHAIN_NAME_DEST = 'atmchain' AND ID < '{}'".format(id))
             return
         else:
             for record in result:
                 self.deposit(record[1], record[2], record[5])
         self.DBService.db_close(db)
 
+    # 只有当监听线程执行withdraw失败后(CHAIN_NAME_DEST = 'ethereum')，才可以手动withdraw
     def withdraw_manual(self,id):
         db = self.DBService.new_db_connect()
         result = self.DBService.find_rows(db, 'WITHDRAW',"STAGE = '2' AND CHAIN_NAME_DEST = 'ethereum' AND ID < '{}'".format(id))
         if result == None or result == tuple():
+            log.info("[withdraw_manual]not find matched records: STAGE = '2' AND CHAIN_NAME_DEST = 'ethereum' AND ID < '{}'".format(id))
             return
         else:
             for record in result:
@@ -481,6 +506,7 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
         self.DBService = DBService()
         self.DBService.init_db()
 
+    # 每次启动bridge服务时，1：缓存已经创建的链代理；2：根据数据库中的记录，计算当前已经poll过的区块高度
     def add_new_chain(self,chain_name,_proxy):
         self.current_connected_chain.append(chain_name)
         self.current_blockchain_proxy[chain_name] = _proxy
@@ -508,64 +534,98 @@ class LISTEN_CONTRACT_EVENTS_TASK(object):
         self.DBService.db_close(db)
 
     def update_polling_event(self):
-        reload(custom_contract_events)
-        for key in custom_contract_events.__pollingEventSet__ : 
+        reload(custom)
+        # 遍历用户定义的需要监听的事件
+        for key in custom.__pollingEventSet__ : 
+            
+            # 从key中解析得到chain_name,contract_name,event_name
             chain_name,contract_name,event_name = key.split('_')[:3]
+            
+            # 读取事件相关的过滤参数，及操作数据库的接口
             if chain_name in self.current_connected_chain:
                 if self.polling_events.get(chain_name) == None and self.current_blockchain_proxy.get(chain_name) != None:
                     self.polling_events[chain_name] = dict()
                 if self.polling_events[chain_name].get(contract_name) == None:
                     self.polling_events[chain_name][contract_name] = dict()
-                self.polling_events[chain_name][contract_name][event_name] = custom_contract_events.__pollingEventSet__[key]
-            key = chain_name + '_' + contract_name
-            if self.polling_events_contract_proxy_cache.get(key) == None and \
-                custom_contract_events.__contractInfo__[contract_name]['address']!="" and\
+                self.polling_events[chain_name][contract_name][event_name] = custom.__pollingEventSet__[key]
+            
+            # 缓存合约操作代理对象
+            cache_key = chain_name + '_' + contract_name
+            if self.polling_events_contract_proxy_cache.get(cache_key) == None and \
+                custom.__contractInfo__[contract_name]['address']!="" and\
                 self.current_blockchain_proxy.get(chain_name) != None:
 
-                self.polling_events_contract_proxy_cache[key] = \
+                self.polling_events_contract_proxy_cache[cache_key] = \
                     self.current_blockchain_proxy[chain_name].attach_contract(
                     contract_name,
-                    contract_file=custom_contract_events.__contractInfo__[contract_name]['file'], 
-                    contract_address=unhexlify(custom_contract_events.__contractInfo__[contract_name]['address']),)
+                    contract_file=custom.__contractInfo__[contract_name]['file'], 
+                    contract_address=unhexlify(custom.__contractInfo__[contract_name]['address']),)
             
-
+    def print_event_detail(self,chain_name,contract_name,event_name,event):
+        print('\nCATCHED EVENT: {}::{}::{}. block: {}. hash:{}.'.format(chain_name,contract_name,event_name,event['block_number'],event['transaction_hash']))
+        
+        if event_name in ["Transfer"]:
+            print('EVENT ARGS: from: {} to: {} value: {}.\n'.format(event["_from"], event["_to"], event["_value"]))
+        
+        if event_name in ["Minted"]:
+            print('EVENT ARGS: to: {} num: {}.\n'.format(event["_to"], event["_num"]))
+        
+        if event_name in ["LogLockToken","LogSettleToken"]:
+            print('EVENT ARGS: user: {} amount: {}.\n'.format(event["_user"], event["_amount"]))
+        
+        if event_name in ["Deposit","Withdraw","WithdrawConfirmation"]:
+            print('EVENT ARGS: recipient: {} value: {} transactionHash: {}.\n'.format(event["recipient"], event["value"], hexlify(event["transactionHash"])))
+        
+        if event_name in ["TransferBack"]:
+            print('EVENT ARGS: recipient: {} value: {}.\n'.format(event["recipient"], event["value"]))
+        
+                            
     def run(self):
         db = self.DBService.new_db_connect()
         while not self.is_stopped:
+            # 定时3s周期扫描
             gevent.sleep(self.polling_delay)
+            # 更新事件相关的配置，支持在运行时修改事件过滤参数及增加新的事件
             self.update_polling_event()
-           
+            # 遍历所有需要监听的事件
             for chain_name in self.polling_events.keys() : 
-
+                
+                # 获取当前已经监听到到区块高度，下次扫描事件到时候从记录的高度开始扫描，不需要重复扫描已扫描过的区块
                 chain_proxy = self.current_blockchain_proxy[chain_name]
                 polling_current_blocknumber = chain_proxy.block_number()
                 
                 for contract_name in self.polling_events[chain_name] :
+                    # 获取对应的合约代理
                     contract_proxy = self.polling_events_contract_proxy_cache.get(chain_name + '_' + contract_name)
                     if contract_proxy == None:
                         print('@@@@@@@@ CHAIN [{}] contract [{}] has no proxy.'.format(chain_name,contract_name))
                         continue
-
+                    # 获取对应的合约代理，并poll事件
                     for event_name in self.polling_events[chain_name][contract_name] :
                         event_key, events = contract_proxy.poll_contract_event(
                             self.polled_blocknumber[chain_name],
                             event_name,
-                            0,False,
+                            0, #poll的超时时间是0，表示没有poll到事件时不等待。
+                            False,
                             *self.polling_events[chain_name][contract_name][event_name]["filter_args"]
                         )
+                        # 没有poll到事件
                         if events == list():
                             log.debug('step idle ',contract_name,event_name)
                             continue
+                        # poll到事件
                         for event in events:
-                            print('\nCATCHED EVENT: {}::{}::{}. block: {}. hash:{}.\n'.format(chain_name,contract_name,event_name,event['block_number'],event['transaction_hash']))
+                            self.print_event_detail(chain_name,contract_name,event_name,event)
+                            # 如果获取的事件没有定义回调处理函数，则不处理
                             if self.DBService.polling_events_callback.get(chain_name + '_' + contract_name + '_' + event_name) == None:
                                 log.error('polling_events_callback is nil. ',chain_name,contract_name,event_name)
                                 continue
+                            # 获取回调处理函数及对应的数据库操作接口
                             DBcallback = self.DBService.polling_events_callback[chain_name + '_' + contract_name + '_' + event_name]
                             sql_sets = self.polling_events[chain_name][contract_name][event_name]['stage']
-                            
+                            # 执行回调函数，其中event['transaction_hash']是事件所在的交易的hash
                             DBcallback(db,sql_sets,event['transaction_hash'],(event))
-                        
+                # 记录当前polled的区块高度
                 self.polled_blocknumber[chain_name] = polling_current_blocknumber+1
         self.DBService.db_close(db)
     
@@ -614,16 +674,18 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
         _proxy = self._get_chain_proxy(chain_name)
         transaction_hash = _proxy.sendRawTransaction(signed_data)
         #过滤向homebridge转atm token的离线交易
-        if chain_name == 'ethereum' and transaction_hash !='' and signed_data[76:84] == 'a9059cbb' and signed_data[108:148] == custom_contract_events.__contractInfo__['HomeBridge']['address']:
-            sql = custom_contract_events.ATM_Deposit1_insert_DBtable('0x'+transaction_hash)
-            self.atm_bridge_worker.DBService.ethereum_ATMToken_Transfer_offline_to_DB(sql)
+        if chain_name == 'ethereum' and transaction_hash !='' and signed_data[76:84] == 'a9059cbb' and signed_data[108:148] == custom.__contractInfo__['HomeBridge']['address']:
+            sql = custom.ATM_Deposit1_insert_DBtable('0x'+transaction_hash)
+            db = self.atm_bridge_worker.DBService.new_db_connect()
+            self.atm_bridge_worker.DBService.ethereum_ATMToken_Transfer_offline_to_DB(db,sql)
+            self.atm_bridge_worker.DBService.db_close(db)
 
         if chain_name == 'atmchain':
             print("to be continue .....",signed_data)
 
         return transaction_hash
 
-    def query_currency_balance(self,chain_name,account):
+    def query_coin_balance(self,chain_name,account):
         _proxy = self._get_chain_proxy(chain_name)
 
         temp = _proxy.balance(address_decoder(account))
@@ -637,18 +699,18 @@ class PYETHAPI_ATMCHAIN(PYETHAPI):
 
         ERC20Token_ethereum = ethereum_proxy.attach_contract(
                     'ATMToken',
-                    contract_file=custom_contract_events.__contractInfo__['ATMToken']['file'], 
-                    contract_address=unhexlify(custom_contract_events.__contractInfo__['ATMToken']['address']),)
+                    contract_file=custom.__contractInfo__['ATMToken']['file'], 
+                    contract_address=unhexlify(custom.__contractInfo__['ATMToken']['address']),)
 
         if ERC20Token_ethereum == None:
             return result
-        temp = self.query_currency_balance(src_chain, account)
+        temp = self.query_coin_balance(src_chain, account)
         result['ETH_balance'] = temp
 
         temp = ERC20Token_ethereum.balanceOf(account) if ERC20Token_ethereum != None else 0
         result['ATM_balance_ethereum'] = temp
     
-        temp = self.query_currency_balance(dest_chain, account)
+        temp = self.query_coin_balance(dest_chain, account)
         result['ATM_balance_atmchain'] = temp
     
         return result

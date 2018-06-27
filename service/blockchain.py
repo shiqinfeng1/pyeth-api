@@ -203,7 +203,8 @@ class BlockChainProxy(object):
             return None
         if self.jsonrpc_proxys.get(sender) == None:
             private_key = self.account_manager.get_account(sender,password).privkey
-
+            if private_key == None:
+                return None
             if len(hexlify(private_key)) != 64:
                 private_key = decode_hex(private_key)
 

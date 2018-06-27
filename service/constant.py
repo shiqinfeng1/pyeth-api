@@ -2,10 +2,10 @@
 from ethereum.utils import denoms
 
 GAS_LIMIT = 3141592  # Morden's gasLimit.
-GAS_PRICE = denoms.shannon * 1    #1Gwei
+GAS_PRICE = denoms.shannon * 20    #1Gwei
 WEI_TO_ETH = 10 ** 18
 ATM_DECIMALS = 10 ** 8
-DEFAULT_POLL_TIMEOUT = 30
+DEFAULT_POLL_TIMEOUT = 120
 INITIAL_PORT = 40001
 DEFAULT_TIMEOUT = 15
 DEFAULT_RETRY_INTERVAL = 3

@@ -133,8 +133,8 @@ contract ATMToken is StandardToken, Owned {
     function ATMToken() {
         totalSupply = 10000 * MILLION; //设置当前ATM发行总量
 
-        balances[0xed2225cfe3e101ea5a924ce8855fa19b800e7f53] = 9200 * MILLION;
-        balances[0xf65220237a77cb3063e14598125afbe99d9db6ce] = 800 * MILLION;
+        balances[0x1dcef12e93b0abf2d36f723e8b59cc762775d513] = 9200 * MILLION;
+        balances[0x5252781539b365e08015fa7ed77af5a36097f39d] = 800 * MILLION;
     }
 
     function getATMTotalSupply() external constant returns(uint256) {

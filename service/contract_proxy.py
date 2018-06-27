@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from ethereum.abi import ContractTranslator
 from ethereum.utils import normalize_address
-import custom.custom_contract_events as custom_contract_events
+import custom.custom_contract_events as custom
 from ethereum import slogging
 from binascii import hexlify, unhexlify
 log = slogging.get_logger("root")  # pylint: disable=invalid-name
@@ -53,12 +53,12 @@ class ContractProxy(object):
         reload custom_contract_events module to get latest custom event filters
         """
         if need_reload:
-            reload(custom_contract_events)
+            reload(custom)
 
         event = list()
         event_key = self.contract_name+'_'+event_name
-        if event_key in custom_contract_events.__conditionSet__.keys(): 
-            condition = custom_contract_events.__conditionSet__[event_key]
+        if event_key in custom.__conditionSet__.keys(): 
+            condition = custom.__conditionSet__[event_key]
             event = self.jsonrpc_client.poll_contract_events(
                 self.address,
                 self.translator,

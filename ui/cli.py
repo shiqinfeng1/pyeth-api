@@ -16,7 +16,7 @@ from ethereum import slogging
 from api.python import PYETHAPI_ATMCHAIN
 from applications.twitter_rewards_plan.twitter_rewards_plan import PYETHAPI_ATMCHAIN_REWARDS_PLAN
 from ui.console import Console
-import custom.custom_contract_events as custom_contract_events
+import custom.custom_contract_events as custom
 
 pyethapi = dict()
 pyethapi['atmchain'] = PYETHAPI_ATMCHAIN
@@ -153,6 +153,90 @@ def  _get_pyeth_api(inst,blockchain_proxy):
         pyeth_api = pyethapi['atmchain'](blockchain_proxy)
     return pyeth_api
 
+def _init_bridge(kwargs,pyeth_api):
+    
+    admin_account = str(kwargs['admin'])
+    print("======创建链代理:ethereum,atmchain. 并部署相关合约============")
+    proxy1 = pyeth_api.new_blockchain_proxy("ethereum",custom.__chainConfig__['ethereum']['endpoint'],os.getcwd()+'/'+sys.argv[0]+'/keystore',admin_account)
+    proxy2 = pyeth_api.new_blockchain_proxy("atmchain",custom.__chainConfig__['atmchain']['endpoint'],os.getcwd()+'/'+sys.argv[0]+'/keystore',admin_account)
+    
+    admin_password = str(kwargs['password'])
+    if admin_password ==None:
+        admin_password = click.prompt('Enter the password to unlock admin account %s' % admin_account, default='', hide_input=True,
+                            confirmation_prompt=False, show_default=False)
+
+    account_atmchain = pyeth_api.get_admin_account('atmchain')
+    admin_password_atmchain =admin_password
+    pyeth_api.set_admin_password('atmchain',admin_password_atmchain)
+
+    account_ethereum = pyeth_api.get_admin_account('ethereum')
+    admin_password_ethereum = admin_password
+    pyeth_api.set_admin_password('ethereum',admin_password_ethereum)
+
+    ContractAddress = custom.__contractInfo__['ContractAddress']['address']
+
+    if ContractAddress == "":
+        ContractAddress_proxy = proxy2.deploy_contract( 
+            account_atmchain,
+            custom.__contractInfo__['ContractAddress']['file'], 'ContractAddress',
+            password=admin_password_atmchain,
+        )
+    else:
+        ContractAddress_proxy = proxy2.attach_contract(
+            'ContractAddress',
+            contract_file = custom.__contractInfo__['ContractAddress']['file'],
+            contract_address = unhexlify(ContractAddress), #ContractAddress.address, 
+            attacher = account_atmchain,
+            password=admin_password_atmchain,
+        )
+    if ContractAddress_proxy == None:
+        print("\n************\nContractAddress Contarct Proxy Get Fail.\n************")
+        return 
+
+    if custom.__contractInfo__['ForeignBridge']['address'] == "":
+        foreignbridge_proxy = proxy2.deploy_contract( 
+            account_atmchain,
+            custom.__contractInfo__['ForeignBridge']['file'], 'ForeignBridge',
+            (1,[account_atmchain]),
+            password=admin_password_atmchain
+            )
+        txhash = ContractAddress_proxy.set_foreigin_bridge('0x'+hexlify(foreignbridge_proxy.address))
+        result, txhash = proxy2.poll_contarct_transaction_result(txhash) 
+        if result == "transaction execute failed":
+            raise RuntimeError("transaction execute failed. txhash:{}".format(txhash))
+    elif ContractAddress_proxy.foreigin_bridge() != custom.__contractInfo__['ForeignBridge']['address']:
+        print('[**WARNING**]foreigin_bridge is already deployed:{}. while configed:{}'.format(ContractAddress_proxy.foreigin_bridge(),custom.__contractInfo__['ForeignBridge']['address']))
+
+    if custom.__contractInfo__['HomeBridge']['address'] == "":
+        homeBridge_proxy = proxy1.deploy_contract( 
+            account_ethereum,
+            custom.__contractInfo__['HomeBridge']['file'], 'HomeBridge',
+            (1,[account_ethereum]),
+            password=admin_password_ethereum
+            )
+        txhash = ContractAddress_proxy.set_home_bridge('0x'+hexlify(homeBridge_proxy.address))
+        result, txhash = proxy2.poll_contarct_transaction_result(txhash) 
+        if result == "transaction execute failed":
+            raise RuntimeError("transaction execute failed. txhash:{}".format(txhash))
+    elif ContractAddress_proxy.home_bridge() != custom.__contractInfo__['HomeBridge']['address']:
+        print('[**WARNING**]HomeBridge is already deployed:{}. while configed:{}'.format(ContractAddress_proxy.home_bridge(),custom.__contractInfo__['HomeBridge']['address']))
+
+    addr = '0x'+custom.__contractInfo__['ATMToken']['address']
+    if addr == "0x":
+        ATMToken_proxy = proxy1.deploy_contract(
+            account_ethereum,
+            custom.__contractInfo__['ATMToken']['file'], 'ATMToken',
+            password=admin_password_ethereum
+            )
+        addr = '0x'+hexlify(ATMToken_proxy.address)
+
+    if ContractAddress_proxy.atm_token() != addr[2:] :
+        txhash = ContractAddress_proxy.set_atm_token(addr)
+        result, txhash = proxy2.poll_contarct_transaction_result(txhash) 
+        if result == "transaction execute failed":
+            raise RuntimeError("transaction execute failed. txhash:{}".format(txhash))
+    return
+    
 @click.group(invoke_without_command=True)
 @options
 @click.pass_context
@@ -196,86 +280,10 @@ def run(ctx, **kwargs):
                     api_port,
                 )
             )
-
-        admin_account = str(kwargs['admin'])
-        print("======创建链代理:ethereum,atmchain. 并部署相关合约============")
-        proxy1 = pyeth_api.new_blockchain_proxy("ethereum",custom_contract_events.__chainConfig__['ethereum']['endpoint'],os.getcwd()+'/'+sys.argv[0]+'/keystore',admin_account)
-        proxy2 = pyeth_api.new_blockchain_proxy("atmchain",custom_contract_events.__chainConfig__['atmchain']['endpoint'],os.getcwd()+'/'+sys.argv[0]+'/keystore',admin_account)
         
-        admin_password = str(kwargs['password'])
-        if admin_password ==None:
-            admin_password = click.prompt('Enter the password to unlock admin account %s' % admin_account, default='', hide_input=True,
-                                confirmation_prompt=False, show_default=False)
+        _init_bridge(kwargs,pyeth_api)
 
-        account_atmchain = pyeth_api.get_admin_account('atmchain')
-        admin_password_atmchain =admin_password
-        pyeth_api.set_admin_password('atmchain',admin_password_atmchain)
-
-        account_ethereum = pyeth_api.get_admin_account('ethereum')
-        admin_password_ethereum = admin_password
-        pyeth_api.set_admin_password('ethereum',admin_password_ethereum)
-
-        ContractAddress = custom_contract_events.__contractInfo__['ContractAddress']['address']
-
-        if ContractAddress == "":
-            ContractAddress_proxy = proxy2.deploy_contract( 
-                account_atmchain,
-                custom_contract_events.__contractInfo__['ContractAddress']['file'], 'ContractAddress',
-                password=admin_password_atmchain,
-            )
-        else:
-            ContractAddress_proxy = proxy2.attach_contract(
-                'ContractAddress',
-                contract_file = custom_contract_events.__contractInfo__['ContractAddress']['file'],
-                contract_address = unhexlify(ContractAddress), #ContractAddress.address, 
-                attacher = account_atmchain,
-                password=admin_password_atmchain,
-            )
-
-        if custom_contract_events.__contractInfo__['ForeignBridge']['address'] == "":
-            foreignbridge_proxy = proxy2.deploy_contract( 
-                account_atmchain,
-                custom_contract_events.__contractInfo__['ForeignBridge']['file'], 'ForeignBridge',
-                (1,[account_atmchain]),
-                password=admin_password_atmchain
-                )
-            txhash = ContractAddress_proxy.set_foreigin_bridge('0x'+hexlify(foreignbridge_proxy.address))
-            result, txhash = proxy2.poll_contarct_transaction_result(txhash) 
-            if result == "transaction execute failed":
-                raise RuntimeError("transaction execute failed. txhash:{}".format(txhash))
-        elif ContractAddress_proxy.foreigin_bridge() != custom_contract_events.__contractInfo__['ForeignBridge']['address']:
-            print('[**WARNING**]foreigin_bridge is already deployed:{}. while configed:{}'.format(ContractAddress_proxy.foreigin_bridge(),custom_contract_events.__contractInfo__['ForeignBridge']['address']))
-
-
-        if custom_contract_events.__contractInfo__['ATMToken']['address'] == "":
-            ATMToken_proxy = proxy1.deploy_contract( 
-                account_ethereum,
-                custom_contract_events.__contractInfo__['ATMToken']['file'], 'ATMToken',
-                password=admin_password_ethereum
-                )
-            txhash = ContractAddress_proxy.set_atm_token('0x'+hexlify(ATMToken_proxy.address))
-            result, txhash = proxy1.poll_contarct_transaction_result(txhash) 
-            if result == "transaction execute failed":
-                raise RuntimeError("transaction execute failed. txhash:{}".format(txhash))
-        elif ContractAddress_proxy.atm_token() != custom_contract_events.__contractInfo__['ATMToken']['address']:
-            print('[**WARNING**]atm_token is already deployed:{}. while configed:{}'.format(ContractAddress_proxy.atm_token(),custom_contract_events.__contractInfo__['ATMToken']['address']))
         
-        if custom_contract_events.__contractInfo__['HomeBridge']['address'] == "":
-            homeBridge_proxy = proxy1.deploy_contract( 
-                account_ethereum,
-                custom_contract_events.__contractInfo__['HomeBridge']['file'], 'HomeBridge',
-                (1,[account_ethereum]),
-                password=admin_password_ethereum
-                )
-            txhash = ContractAddress_proxy.set_home_bridge('0x'+hexlify(homeBridge_proxy.address))
-            result, txhash = proxy1.poll_contarct_transaction_result(txhash) 
-            if result == "transaction execute failed":
-                raise RuntimeError("transaction execute failed. txhash:{}".format(txhash))
-        elif ContractAddress_proxy.home_bridge() != custom_contract_events.__contractInfo__['HomeBridge']['address']:
-            print('[**WARNING**]HomeBridge is already deployed:{}. while configed:{}'.format(ContractAddress_proxy.home_bridge(),custom_contract_events.__contractInfo__['HomeBridge']['address']))
-        
-        """=======end============="""
-
         if ctx.params['console']:
             console = Console(pyeth_api)
             console.start()

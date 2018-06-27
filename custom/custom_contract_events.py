@@ -207,7 +207,7 @@ def ATM_Deposit3_update_DBtable(event):
         WHERE TRANSACTION_HASH_SRC = '%s'" % \
         (3, 'atmchain', event['transaction_hash'], event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), '0x'+hexlify(event['transactionHash']))
     return sql
-
+# TRANSACTION_HASH_SRC 是withdraw操作的源链，即atmchain
 def ATM_Withdraw3_update_DBtable(event):
     sql = "UPDATE WITHDRAW SET STAGE = '%d', \
         CHAIN_NAME_DEST = '%s', TRANSACTION_HASH_DEST = '%s', BLOCK_NUMBER_DEST = '%d',TIME_STAMP = '%s' \
@@ -216,10 +216,10 @@ def ATM_Withdraw3_update_DBtable(event):
     return sql
 
 __contractInfo__ = {
-    'ContractAddress':{'file':'ContractAddress.sol','address':"25e7b4d020a8152e803e7c154296704fe415f103"},
-    'ATMToken':{'file':'ATMToken.sol','address':"94cd062d0a21f6005d677f49afcdfebb0774628b"},
-    'HomeBridge':{'file':'bridge_v2.sol','address':"f65220237a77cb3063e14598125afbe99d9db6ce"},
-    'ForeignBridge':{'file':'bridge_v2.sol','address':"f4bca9c39edfdf579a8f3b144dc90d4e3e302882"},
+    'ContractAddress':{'file':'ContractAddress.sol','address':"7d88a18649fe5de4f35c701dad88d97b0d762ec2"},
+    'ATMToken':{'file':'ATMToken.sol','address':"42cca44fa7e65ba9051f98469df70bccf50b1cf4"},
+    'HomeBridge':{'file':'bridge_v2.sol','address':"a3b5583703b9316246917d3ee9dcd7aed8eb9cff"},
+    'ForeignBridge':{'file':'bridge_v2.sol','address':"6db0d943ba112497281a7eabee52a06c0d49f9da"},
 }
 
 __pollingEventSet__ = {
@@ -234,7 +234,7 @@ __DBConfig__ = {
     'host':"localhost",
     'port':3306,
     'user':"root",
-    'password':"11111111",
+    'password':"atmchain666",
     'db':"atm_bridge",
     'charset':"utf8",
     'autocommit':True,
@@ -244,8 +244,8 @@ __BridgeConfig__ = {
 }
 
 __chainConfig__ = {
-    'ethereum':{'endpoint':"localhost:8544"},
-    'atmchain':{'endpoint':"localhost:8545"}
+    'ethereum':{'endpoint':"rinkeby"},
+    'atmchain':{'endpoint':"localhost:21024"}
 }
     
 
