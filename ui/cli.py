@@ -155,16 +155,22 @@ def  _get_pyeth_api(inst,blockchain_proxy):
 
 def _init_bridge(kwargs,pyeth_api):
     
+    if kwargs['admin'] == None:
+        raise RuntimeError("not admin account!!!") 
+
     admin_account = str(kwargs['admin'])
     print("======创建链代理:ethereum,atmchain. 并部署相关合约============")
     proxy1 = pyeth_api.new_blockchain_proxy("ethereum",custom.__chainConfig__['ethereum']['endpoint'],os.getcwd()+'/'+sys.argv[0]+'/keystore',admin_account)
     proxy2 = pyeth_api.new_blockchain_proxy("atmchain",custom.__chainConfig__['atmchain']['endpoint'],os.getcwd()+'/'+sys.argv[0]+'/keystore',admin_account)
     
-    admin_password = str(kwargs['password'])
-    if admin_password ==None:
+    if kwargs['password'] == None:
         admin_password = click.prompt('Enter the password to unlock admin account %s' % admin_account, default='', hide_input=True,
                             confirmation_prompt=False, show_default=False)
-
+    else:
+        password_file = str(kwargs['password'])
+        f = open(password_file, 'r')
+        admin_password = f.read().splitlines()[0]
+    
     account_atmchain = pyeth_api.get_admin_account('atmchain')
     admin_password_atmchain =admin_password
     pyeth_api.set_admin_password('atmchain',admin_password_atmchain)

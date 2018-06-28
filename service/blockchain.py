@@ -198,11 +198,12 @@ class BlockChainProxy(object):
             if not check_json_rpc(self.jsonrpc_client_without_sender):
                 raise RuntimeError('BlockChainProxy connect eth-client fail.')
             print("check_json_rpc ok.")
-    def get_jsonrpc_client_with_sender(self, sender, password=None):
+
+    def get_jsonrpc_client_with_sender(self, sender, password=None,password_file=None):
         if sender == None:
             return None
         if self.jsonrpc_proxys.get(sender) == None:
-            private_key = self.account_manager.get_account(sender,password).privkey
+            private_key = self.account_manager.get_account(sender,password,password_file).privkey
             if private_key == None:
                 return None
             if len(hexlify(private_key)) != 64:
@@ -219,6 +220,9 @@ class BlockChainProxy(object):
                     self.third_party_endpoint,
                     privkey = private_key,
                 )
+        private_key = self.account_manager.get_account(sender,password,password_file).privkey
+        if private_key == None:
+            return None
         return self.jsonrpc_proxys[sender]
 
     def attach_contract(self, 
@@ -350,9 +354,9 @@ class BlockChainProxy(object):
         self.local_contract_proxys[contract_name] = contract_proxy
         return contract_proxy
 
-    def transfer_currency(self, chain_name, sender, to, eth_amount,password=None):
+    def transfer_currency(self, chain_name, sender, to, eth_amount,password=None,password_file=None):
         
-        client = self.get_jsonrpc_client_with_sender(sender,password)
+        client = self.get_jsonrpc_client_with_sender(sender,password,password_file)
         if client == None:
             return
 
@@ -367,12 +371,12 @@ class BlockChainProxy(object):
             ))
 
         if chain_name == 'ethereum':
-            print("Sending {} eth to:".format(eth_amount))
+            print("Sending {} (10^18) eth to:".format(eth_amount))
         else:
-            print("Sending {} ATM to:".format(eth_amount))
+            print("Sending {} (10^18) ATM to:".format(eth_amount))
 
         print("  - {}".format(to))
-        return client.send_transaction(sender=client.sender, to=to, value=eth_amount)
+        return client.send_transaction(sender=client.sender, to=to, value=eth_amount, startgas=100000)
 
     def estimate_blocktime(self, oldest=256):
         """Calculate a blocktime estimate based on some past blocks.
