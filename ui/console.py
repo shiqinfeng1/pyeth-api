@@ -15,7 +15,7 @@ from devp2p.service import BaseService
 from ethereum import slogging
 from ethereum.utils import denoms
 from pyethapp.utils import bcolors as bc
-
+from rlp.utils import decode_hex
 from pyethapp.console_service import GeventInputHook, SigINTHandler
 from api.python import PYETHAPI
 from service.utils import  get_contract_path, safe_address_decode,privatekey_to_address
@@ -101,13 +101,13 @@ class ATMChainTools(object):
         for key in sorted(res.keys()):
             print('{:<30}: {:,}'.format(key, res[key]))
 
-
     def new_account(self,chain_name, key=None):
         assert isinstance(key,str) and len(key)==64
+        hexkey = decode_hex(key)
 
         password = click.prompt('Password to encrypt private key', default='', hide_input=True,
                                 confirmation_prompt=False, show_default=False)
-        self.pyeth_api.new_account(chain_name, password, key)
+        self.pyeth_api.new_account(chain_name, password, hexkey)
 
     def set_admin_account(self,chain_name,old_admin_address,new_admin_address):
         self.pyeth_api.set_admin_account(chain_name,old_admin_address,new_admin_address)

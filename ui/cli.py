@@ -212,6 +212,7 @@ def _init_bridge(kwargs,pyeth_api):
             raise RuntimeError("transaction execute failed. txhash:{}".format(txhash))
     elif ContractAddress_proxy.foreigin_bridge() != custom.__contractInfo__['ForeignBridge']['address']:
         print('[**WARNING**]foreigin_bridge is already deployed:{}. while configed:{}'.format(ContractAddress_proxy.foreigin_bridge(),custom.__contractInfo__['ForeignBridge']['address']))
+        ContractAddress_proxy.set_foreigin_bridge('0x'+custom.__contractInfo__['ForeignBridge']['address'])
 
     if custom.__contractInfo__['HomeBridge']['address'] == "":
         homeBridge_proxy = proxy1.deploy_contract( 
@@ -226,7 +227,8 @@ def _init_bridge(kwargs,pyeth_api):
             raise RuntimeError("transaction execute failed. txhash:{}".format(txhash))
     elif ContractAddress_proxy.home_bridge() != custom.__contractInfo__['HomeBridge']['address']:
         print('[**WARNING**]HomeBridge is already deployed:{}. while configed:{}'.format(ContractAddress_proxy.home_bridge(),custom.__contractInfo__['HomeBridge']['address']))
-
+        ContractAddress_proxy.set_home_bridge('0x'+custom.__contractInfo__['HomeBridge']['address'])
+    
     addr = '0x'+custom.__contractInfo__['ATMToken']['address']
     if addr == "0x":
         ATMToken_proxy = proxy1.deploy_contract(

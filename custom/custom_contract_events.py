@@ -214,12 +214,19 @@ def ATM_Withdraw3_update_DBtable(event):
         WHERE TRANSACTION_HASH_SRC = '%s'" % \
         (3, 'ethereum', event['transaction_hash'], event['block_number'],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(time.time())), '0x'+hexlify(event['transactionHash']))
     return sql
-
+""" rinkeby
 __contractInfo__ = {
     'ContractAddress':{'file':'ContractAddress.sol','address':"7d88a18649fe5de4f35c701dad88d97b0d762ec2"},
     'ATMToken':{'file':'ATMToken.sol','address':"42cca44fa7e65ba9051f98469df70bccf50b1cf4"},
     'HomeBridge':{'file':'bridge_v2.sol','address':"a3b5583703b9316246917d3ee9dcd7aed8eb9cff"},
     'ForeignBridge':{'file':'bridge_v2.sol','address':"6db0d943ba112497281a7eabee52a06c0d49f9da"},
+}
+"""
+__contractInfo__ = {
+    'ContractAddress':{'file':'ContractAddress.sol','address':"272ffa2cf090815e5cac7b89ad5e3266800f0ff4"},
+    'ATMToken':{'file':'ATMToken.sol','address':"9B11EFcAAA1890f6eE52C6bB7CF8153aC5d74139"},
+    'HomeBridge':{'file':'bridge_v2.sol','address':"7d88a18649fe5de4f35c701dad88d97b0d762ec2"},
+    'ForeignBridge':{'file':'bridge_v2.sol','address':"1d151c966b875188583e35500b3473eb84e75d71"},
 }
 
 __pollingEventSet__ = {
@@ -244,7 +251,7 @@ __BridgeConfig__ = {
 }
 
 __chainConfig__ = {
-    'ethereum':{'endpoint':"rinkeby"},
+    'ethereum':{'endpoint':"mainnet"},
     'atmchain':{'endpoint':"localhost:21024"}
 }
     

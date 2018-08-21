@@ -181,8 +181,16 @@ class BlockChainProxy(object):
         self.port = None
         
         """如果是第三方节点地址"""
+        """
+        Mainnet	production network	https://mainnet.infura.io/z7VCrH76ShUESILAXskq
+        Ropsten	test network	https://ropsten.infura.io/z7VCrH76ShUESILAXskq
+        INFURAnet	test network	https://infuranet.infura.io/z7VCrH76ShUESILAXskq
+        Kovan	test network	https://kovan.infura.io/z7VCrH76ShUESILAXskq
+        Rinkeby	test network	https://rinkeby.infura.io/z7VCrH76ShUESILAXskq
+        IPFS	gateway	https://ipfs.infura.io
+        """
         if endpoint in ['mainnet', 'ropsten', 'kovan', 'rinkeby']:
-            self.third_party_endpoint  = 'https://'+endpoint+'.infura.io/SaTkK9e9TKrRuhHg'
+            self.third_party_endpoint  = 'https://'+endpoint+'.infura.io/z7VCrH76ShUESILAXskq'
             self.jsonrpc_client_without_sender = JSONRPCClient_for_infura(
                 self.third_party_endpoint,
                 '',
@@ -569,7 +577,8 @@ class JSONRPCClient(object):
             constructor_parameters,
             contract_path=None,
             timeout=None,
-            gasprice=constant.GAS_PRICE):
+            gasprice=constant.GAS_PRICE,
+            gaslimit=constant.GAS_LIMIT):
         """
         Deploy a solidity contract.
         Args:
@@ -635,6 +644,7 @@ class JSONRPCClient(object):
                     to='',
                     data=bytecode,
                     gasprice=gasprice,
+                    startgas=gaslimit,
                 )
                 transaction_hash = unhexlify(transaction_hash_hex)
 
@@ -667,6 +677,7 @@ class JSONRPCClient(object):
             to='',
             data=bytecode,
             gasprice=gasprice,
+            startgas=gaslimit,
         )
         transaction_hash = unhexlify(transaction_hash_hex)
         self.poll(transaction_hash, timeout=timeout)

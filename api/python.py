@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 import pymysql
 from ethereum.utils import normalize_address
 from binascii import hexlify, unhexlify
@@ -74,7 +75,7 @@ class PYETHAPI(object):
 
     """创建新账户"""
     def new_account(self, chain_name, password=None, key=None):
-        assert isinstance(key,str) and len(key)==64
+        
         id_ = uuid4()
         _proxy = self._get_chain_proxy(chain_name)
 

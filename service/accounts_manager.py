@@ -316,7 +316,7 @@ class AccountManager(object):
         account already known to the service. Note that address collisions do not result in an
         exception as those may slip through anyway for locked accounts with hidden addresses.
         """
-        log.info('adding account', account=account)
+        log.info('adding account', account=account,path=account.path)
         if account.uuid is not None:
             for address in self.accounts.keys():
                 with open(self.accounts[address]) as data_file:
